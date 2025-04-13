@@ -116,4 +116,4 @@ Key metrics for success:
 
 ## License
 
-This project is proprietary software and all rights are reserved. The source code is not available for redistribution or use outside of the official deployment. 
+This project is proprietary software and all rights are reserved. The source code is not available for redistribution or use outside of the official deployment.

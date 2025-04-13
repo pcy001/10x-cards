@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    const { source_text } = result.data;
+    const { source_text, target_language, generation_type, difficulty_level, limit } = result.data;
 
     // Check text size to prevent abuse
     if (source_text.length > 10000) {
@@ -50,10 +50,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     // Generate flashcards using AI
-    const flashcards = await generateFlashcardsFromText(source_text);
+    const { detectedLanguage, flashcards } = await generateFlashcardsFromText({
+      sourceText: source_text,
+      targetLanguage: target_language,
+      generationType: generation_type,
+      difficultyLevel: difficulty_level,
+      limit,
+    });
 
     // Return the generated flashcards
     const response: GenerateFlashcardsResponseDto = {
+      detected_source_language: detectedLanguage,
       flashcards: flashcards,
     };
 

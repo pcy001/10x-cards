@@ -72,15 +72,22 @@ export interface DeleteAccountDto {
 // Flashcard DTOs
 export interface GenerateFlashcardsDto {
   source_text: string; // Limited to 10,000 characters
+  target_language: string; // ISO language code for translations (e.g. "pl", "en", "es")
+  generation_type?: "vocabulary" | "phrases" | "definitions"; // Optional type of content to generate
+  difficulty_level?: "beginner" | "intermediate" | "advanced"; // Optional difficulty level
+  limit?: number; // Optional max number of flashcards to generate
 }
 
 export interface GeneratedFlashcardDto {
   temp_id: string;
   front_content: string;
   back_content: string;
+  context?: string; // Optional context where the term appears in the source text
+  difficulty?: string; // Optional difficulty assessment
 }
 
 export interface GenerateFlashcardsResponseDto {
+  detected_source_language: string; // Auto-detected language of the source text
   flashcards: GeneratedFlashcardDto[];
 }
 
@@ -168,6 +175,13 @@ export interface ReviewFlashcardDto {
   difficulty_rating: DifficultyRating;
   is_correct: boolean;
   session_id: UUID;
+}
+
+export interface GetFlashcardForReviewResponseDto {
+  id: UUID;
+  front_content: string;
+  back_content: string;
+  is_ai_generated: boolean;
 }
 
 export interface ReviewFlashcardResponseDto {

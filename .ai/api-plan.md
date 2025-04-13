@@ -104,17 +104,24 @@
 - **Request Body**:
   ```json
   {
-    "source_text": "string" // Limited to 10,000 characters
+    "source_text": "string", // Limited to 10,000 characters
+    "target_language": "string", // ISO language code for translations (e.g. "pl", "en", "es")
+    "generation_type": "string", // Optional: "vocabulary", "phrases", "definitions"
+    "difficulty_level": "string", // Optional: "beginner", "intermediate", "advanced"
+    "limit": "integer" // Optional: max number of flashcards to generate
   }
   ```
 - **Response**:
   ```json
   {
+    "detected_source_language": "string", // Detected language of source text
     "flashcards": [
       {
         "temp_id": "string",
         "front_content": "string",
-        "back_content": "string"
+        "back_content": "string",
+        "context": "string", // Optional: context where the term appears
+        "difficulty": "string" // Optional: difficulty assessment
       }
     ]
   }
@@ -306,6 +313,22 @@
 - **Success Codes**: 200 OK
 - **Error Codes**: 401 Unauthorized
 
+#### Get Flashcard for Review
+- **Method**: GET
+- **URL**: `/api/flashcards/{id}/review`
+- **Description**: Get the full flashcard content including the back content for self-checking
+- **Response**:
+  ```json
+  {
+    "id": "uuid",
+    "front_content": "string",
+    "back_content": "string",
+    "is_ai_generated": "boolean"
+  }
+  ```
+- **Success Codes**: 200 OK
+- **Error Codes**: 401 Unauthorized, 404 Not Found
+
 #### Review Flashcard
 - **Method**: POST
 - **URL**: `/api/flashcards/{id}/review`
@@ -429,6 +452,9 @@ The API will use Supabase Auth for user authentication and authorization. This p
 3. **Learning Session Management**:
    - Sessions track a user's progress through a set of flashcards
    - Flashcards are presented in order of priority (due first, then new)
+   - The client application shows only the front_content initially
+   - The user attempts to recall the answer, then uses the `/api/flashcards/{id}/review` GET endpoint to see the back_content
+   - The user self-assesses their performance and submits a review with a difficulty rating and correctness status
    - Session statistics are calculated at the end of each session
    - Incomplete sessions can be resumed later
 
