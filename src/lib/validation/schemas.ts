@@ -63,6 +63,7 @@ export type FlashcardsQueryInput = z.infer<typeof flashcardsQuerySchema>;
  */
 export const startLearningSessionSchema = z.object({
   limit: z.number().int().positive().max(100).optional().default(20),
+  only_due: z.boolean().optional(),
 });
 
 export type StartLearningSessionInput = z.infer<typeof startLearningSessionSchema>;

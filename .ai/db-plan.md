@@ -37,6 +37,22 @@ Records the history of user interactions with flashcards for the spaced repetiti
 | is_correct | BOOLEAN | NOT NULL | Whether the user answered correctly |
 | difficulty_rating | ENUM | NOT NULL | User's rating of difficulty ('nie_pamietam', 'trudne', 'srednie', 'latwe') |
 | next_review_date | TIMESTAMP WITH TIME ZONE | NOT NULL | When the flashcard should be reviewed next |
+| session_id | UUID | NULL, REFERENCES learning_sessions(id) ON DELETE SET NULL | Session during which the review was performed |
+
+### learning_sessions
+Tracks learning sessions for users, including statistics about the session.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PRIMARY KEY | Unique identifier for the session |
+| user_id | UUID | NOT NULL, REFERENCES auth.users(id) ON DELETE CASCADE | User who owns the session |
+| started_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | When the session was started |
+| ended_at | TIMESTAMP WITH TIME ZONE | NULL | When the session was completed |
+| flashcards_count | INTEGER | NOT NULL | Total number of flashcards in the session |
+| flashcards_reviewed | INTEGER | DEFAULT 0 | Number of flashcards reviewed in the session |
+| correct_answers | INTEGER | DEFAULT 0 | Number of correct answers given |
+| incorrect_answers | INTEGER | DEFAULT 0 | Number of incorrect answers given |
+| is_due_only | BOOLEAN | DEFAULT FALSE | Whether the session includes only flashcards due for review |
 
 ## 2. Relationships
 
@@ -48,6 +64,14 @@ Records the history of user interactions with flashcards for the spaced repetiti
    - One flashcard can have many reviews
    - Each review is for exactly one flashcard
 
+3. **auth.users (1) → learning_sessions (many)**
+   - One user can have many learning sessions
+   - Each learning session belongs to exactly one user
+
+4. **learning_sessions (1) → flashcard_reviews (many)**
+   - One learning session can have many flashcard reviews
+   - Each flashcard review can optionally belong to one learning session
+
 ## 3. Indexes
 
 ### flashcards table
@@ -58,6 +82,11 @@ Records the history of user interactions with flashcards for the spaced repetiti
 - `idx_flashcard_reviews_flashcard_id` on `flashcard_id` - Optimizes joining with flashcards table
 - `idx_flashcard_reviews_next_review_date` on `next_review_date` - Optimizes retrieval of flashcards due for review
 - `idx_flashcard_reviews_review_date` on `review_date` - Optimizes sorting by review date
+- `idx_flashcard_reviews_session_id` on `session_id` - Optimizes joining with learning_sessions table
+
+### learning_sessions table
+- `idx_learning_sessions_user_id` on `user_id` - Optimizes queries that filter sessions by user
+- `idx_learning_sessions_started_at` on `started_at` - Optimizes sorting by start date
 
 ## 4. PostgreSQL Row Level Security (RLS) Policies
 
@@ -119,6 +148,27 @@ CREATE POLICY flashcard_reviews_delete_policy ON flashcard_reviews
   );
 ```
 
+### learning_sessions table
+```sql
+ALTER TABLE learning_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Users can only view their own learning sessions
+CREATE POLICY learning_sessions_select_policy ON learning_sessions
+  FOR SELECT USING (user_id = auth.uid());
+
+-- Users can only insert learning sessions for themselves
+CREATE POLICY learning_sessions_insert_policy ON learning_sessions
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- Users can only update their own learning sessions
+CREATE POLICY learning_sessions_update_policy ON learning_sessions
+  FOR UPDATE USING (user_id = auth.uid());
+
+-- Users can only delete their own learning sessions
+CREATE POLICY learning_sessions_delete_policy ON learning_sessions
+  FOR DELETE USING (user_id = auth.uid());
+```
+
 ## 5. Custom Types and Functions
 
 ### Difficulty Rating Enum
@@ -161,6 +211,8 @@ $$ LANGUAGE plpgsql;
 1. **Simplicity**: The schema is deliberately simple for the MVP, focusing on core functionality without additional complexity.
 
 2. **Hard Delete Strategy**: As specified in the requirements, we use CASCADE deletion for user data when a user is deleted.
+   Additionally, we use CASCADE deletion for flashcard_reviews when a flashcard is deleted, ensuring that all reviews
+   associated with a deleted flashcard are also automatically removed from the database.
 
 3. **Spaced Repetition Algorithm**: The next_review_date calculation is implemented as a database function, enabling consistent application of the algorithm across different parts of the application.
 
@@ -177,11 +229,16 @@ $$ LANGUAGE plpgsql;
    - The schema leverages Supabase's built-in authentication system
    - RLS policies are designed to work with Supabase's auth.uid() function
 
-7. **Future Expansion**:
+7. **Learning Sessions**:
+   - Sessions track a user's learning activity and progress
+   - The `is_due_only` flag allows filtering for sessions that contain only flashcards due for review
+   - Flashcard reviews can be associated with specific sessions via the `session_id` foreign key
+
+8. **Future Expansion**:
    - While the current schema is simple, it provides a solid foundation for future features
    - Additional metadata could be added to the tables as requirements evolve
 
-8. **AI-Generated Flashcards**:
+9. **AI-Generated Flashcards**:
    - AI-generated flashcards are initially returned to the client for user review
    - Only flashcards explicitly accepted by the user are saved to the flashcards table
    - The is_ai_generated flag distinguishes between manually created and AI-generated flashcards

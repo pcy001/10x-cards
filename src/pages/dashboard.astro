@@ -1,9 +1,186 @@
 ---
 import MainLayout from "../layouts/MainLayout.astro";
+import { BookOpen, LucideLibrary } from "lucide-react";
+import ClientDebugger from "@/components/debug/ClientDebugger";
+
+// Sprawdź komunikaty z query params
+const noFlashcards = Astro.url.searchParams.get("noFlashcards") === "true";
+const noFlashcardsDue = Astro.url.searchParams.get("noFlashcardsDue") === "true";
+const error = Astro.url.searchParams.get("error");
+
+// Pobierz dane o fiszkach do powtórki bezpośrednio przez API bez React Query
+const supabase = Astro.locals.supabase;
+const { data: sessionData } = await supabase.auth.getSession();
+const userId = sessionData?.session?.user?.id;
+
+let dueTodayCount = 0;
+let dueNextWeekTotal = 0;
+let dueNextWeekByDay = [];
+
+if (userId) {
+  // Pobierz aktualną datę
+  const today = new Date();
+  const nowISOString = today.toISOString();
+  const todayStr = nowISOString.split("T")[0];
+
+  // Oblicz jutro i 7 dni od dziś
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+
+  // Formatuj daty do zapytań
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
+  const nextWeekStr = nextWeek.toISOString().split("T")[0];
+
+  // Najpierw pobierz id fiszek dla tego użytkownika
+  const { data: userFlashcards } = await supabase.from("flashcards").select("id").eq("user_id", userId);
+
+  if (userFlashcards && userFlashcards.length > 0) {
+    // Wyciągnij ID fiszek do tablicy
+    const flashcardIds = userFlashcards.map((card) => card.id);
+
+    // Zapytanie 1: Pobierz liczbę fiszek należnych dzisiaj
+    const { count } = await supabase
+      .from("flashcard_reviews")
+      .select("id", { count: "exact", head: true })
+      .lte("next_review_date", nowISOString)
+      .in("flashcard_id", flashcardIds);
+
+    dueTodayCount = count || 0;
+
+    // Wyświetl informację dla debugowania
+    console.log(`Znaleziono ${dueTodayCount} fiszek do powtórki teraz (${nowISOString})`);
+
+    // Zapytanie 2: Pobierz fiszki należne w następnym tygodniu
+    const { data: nextWeekCards } = await supabase
+      .from("flashcard_reviews")
+      .select("next_review_date")
+      .gte("next_review_date", `${tomorrowStr}T00:00:00`)
+      .lte("next_review_date", `${nextWeekStr}T23:59:59`)
+      .in("flashcard_id", flashcardIds);
+
+    if (nextWeekCards && nextWeekCards.length > 0) {
+      // Grupuj według dnia po stronie aplikacji
+      const dayCountMap = new Map();
+
+      // Zainicjuj dni z liczbą 0
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(tomorrow);
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split("T")[0];
+        dayCountMap.set(dateStr, 0);
+      }
+
+      // Policz fiszki według dnia
+      for (const card of nextWeekCards) {
+        const dateStr = new Date(card.next_review_date).toISOString().split("T")[0];
+        dayCountMap.set(dateStr, (dayCountMap.get(dateStr) || 0) + 1);
+      }
+
+      // Konwertuj mapę na format tablicy
+      dueNextWeekByDay = Array.from(dayCountMap).map(([date, count]) => ({
+        date,
+        count,
+      }));
+
+      // Sortuj według daty
+      dueNextWeekByDay.sort((a, b) => a.date.localeCompare(b.date));
+
+      // Oblicz sumę dla następnego tygodnia
+      dueNextWeekTotal = dueNextWeekByDay.reduce((sum, day) => sum + day.count, 0);
+    }
+  }
+}
 ---
 
 <MainLayout title="Dashboard | 10xCards">
   <div class="container mx-auto p-4 max-w-6xl">
+    <!-- Powiadomienia -->
+    {
+      noFlashcards && (
+        <div class="mb-4 p-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800">
+          <p class="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-info"
+            >
+              <>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </>
+            </svg>
+            Nie masz jeszcze żadnych fiszek. Dodaj nowe fiszki, aby rozpocząć naukę.
+          </p>
+        </div>
+      )
+    }
+
+    {
+      noFlashcardsDue && (
+        <div class="mb-4 p-4 rounded-md bg-blue-50 border border-blue-200 text-blue-800">
+          <p class="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-info"
+            >
+              <>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </>
+            </svg>
+            Nie masz fiszek do powtórki. Możesz przeglądać wszystkie swoje fiszki lub dodać nowe.
+          </p>
+        </div>
+      )
+    }
+
+    {
+      error && (
+        <div class="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
+          <p class="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-alert-triangle"
+            >
+              <>
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+              </>
+            </svg>
+            {error}
+          </p>
+        </div>
+      )
+    }
+
     <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
       <!-- Sekcja powitalna -->
       <div class="md:col-span-8">
@@ -15,22 +192,85 @@ import MainLayout from "../layouts/MainLayout.astro";
         </div>
       </div>
 
-      <!-- Fiszki do powtórki -->
+      <!-- Fiszki do powtórki - zaimplementowane bezpośrednio w Astro -->
       <div class="md:col-span-4 md:row-span-2 h-fit">
         <div class="bg-card p-6 rounded-lg border shadow-sm">
-          <h2 class="text-lg font-bold mb-4">Fiszki do powtórki</h2>
-
-          <div class="space-y-4">
+          <div class="flex items-center justify-between pb-2 border-b">
+            <h2 class="text-lg font-bold">Fiszki do powtórki</h2>
+          </div>
+          <div class="space-y-4 mt-4">
+            <!-- Licznik fiszek i pasek postępu -->
             <div>
               <div class="flex justify-between items-center mb-1">
-                <span class="text-sm font-medium">Łącznie</span>
-                <span class="font-semibold">0</span>
+                <span class="text-sm font-medium">Na dziś</span>
+                <span class="font-semibold">{dueTodayCount}</span>
               </div>
               <div class="h-2 bg-muted rounded-full overflow-hidden">
-                <div class="h-full bg-primary/20" style="width: 100%"></div>
+                {
+                  dueTodayCount > 0 ? (
+                    <div class="h-full bg-primary" style={{ width: "100%" }} />
+                  ) : (
+                    <div class="h-full bg-primary/20" style={{ width: "100%" }} />
+                  )
+                }
               </div>
-              <p class="text-center text-muted-foreground text-sm mt-4">Nie masz fiszek do powtórki</p>
+
+              <div class="mt-4 space-y-2">
+                {
+                  dueTodayCount > 0 ? (
+                    <a
+                      href="/learning/start?only_due=true"
+                      class="inline-flex items-center justify-center gap-2 w-full rounded-md bg-primary py-2 px-3 text-sm font-medium text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    >
+                      <BookOpen size={16} />
+                      Powtórz fiszki ({dueTodayCount})
+                    </a>
+                  ) : (
+                    <p class="text-center text-muted-foreground text-sm">Nie masz fiszek do powtórki na dziś</p>
+                  )
+                }
+
+                <a
+                  href="/learning/start"
+                  class="inline-flex items-center justify-center gap-2 w-full rounded-md bg-white py-2 px-3 text-sm font-medium text-primary shadow-sm ring-1 ring-inset ring-primary/10 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <LucideLibrary size={16} />
+                  Przeglądaj wszystkie fiszki
+                </a>
+              </div>
             </div>
+
+            <!-- Nadchodzące powtórki -->
+            {
+              dueNextWeekTotal > 0 && (
+                <div class="pt-2">
+                  <h3 class="text-sm font-medium mb-3">Nadchodzące powtórki</h3>
+                  <div class="space-y-2">
+                    {dueNextWeekByDay.map(
+                      (day) =>
+                        day.count > 0 && (
+                          <div class="flex justify-between items-center">
+                            <span class="text-sm text-muted-foreground">
+                              {new Date(day.date).toLocaleDateString("pl-PL", { weekday: "long" })}
+                            </span>
+                            <div class="flex items-center gap-3">
+                              <div class="h-1.5 bg-muted rounded-full w-20 overflow-hidden">
+                                <div
+                                  class="h-full bg-primary"
+                                  style={{
+                                    width: `${Math.min(100, (day.count / dueNextWeekTotal) * 100)}%`,
+                                  }}
+                                />
+                              </div>
+                              <span class="text-sm font-medium">{day.count}</span>
+                            </div>
+                          </div>
+                        )
+                    )}
+                  </div>
+                </div>
+              )
+            }
           </div>
         </div>
       </div>
@@ -69,6 +309,66 @@ import MainLayout from "../layouts/MainLayout.astro";
               </div>
             </a>
 
+            <a href="/learning/start?only_due=true" class="block">
+              <div
+                class="w-full justify-start h-auto py-3 px-4 rounded-md border border-primary bg-primary/5 hover:bg-primary/10 flex items-start gap-3"
+              >
+                <div class="text-primary">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="lucide lucide-repeat"
+                  >
+                    <path d="m17 2 4 4-4 4"></path>
+                    <path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+                    <path d="m7 22-4-4 4-4"></path>
+                    <path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+                  </svg>
+                </div>
+                <div class="text-left">
+                  <div class="font-medium">Powtórz fiszki</div>
+                  <div class="text-xs text-muted-foreground mt-1">Ucz się tylko fiszek, które wymagają powtórzenia</div>
+                </div>
+              </div>
+            </a>
+
+            <a href="/learning/start" class="block">
+              <div
+                class="w-full justify-start h-auto py-3 px-4 rounded-md border hover:bg-muted flex items-start gap-3"
+              >
+                <div class="text-primary">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="lucide lucide-book-open"
+                  >
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                  </svg>
+                </div>
+                <div class="text-left">
+                  <div class="font-medium">Przeglądaj wszystkie fiszki</div>
+                  <div class="text-xs text-muted-foreground mt-1">
+                    Ucz się wszystkich fiszek, niezależnie od terminu powtórki
+                  </div>
+                </div>
+              </div>
+            </a>
+
             <a href="/flashcards" class="block">
               <div
                 class="w-full justify-start h-auto py-3 px-4 rounded-md border hover:bg-muted flex items-start gap-3"
@@ -84,10 +384,14 @@ import MainLayout from "../layouts/MainLayout.astro";
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="lucide lucide-book-open"
+                    class="lucide lucide-list"
                   >
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
                   </svg>
                 </div>
                 <div class="text-left">
@@ -96,37 +400,19 @@ import MainLayout from "../layouts/MainLayout.astro";
                 </div>
               </div>
             </a>
-
-            <a href="/learning/session" class="block">
-              <div
-                class="w-full justify-start h-auto py-3 px-4 rounded-md border hover:bg-muted flex items-start gap-3"
-              >
-                <div class="text-primary">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="lucide lucide-book-open"
-                  >
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                  </svg>
-                </div>
-                <div class="text-left">
-                  <div class="font-medium">Rozpocznij naukę</div>
-                  <div class="text-xs text-muted-foreground mt-1">Zacznij sesję nauki z fiszkami</div>
-                </div>
-              </div>
-            </a>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Debug section - tylko dla deweloperów -->
+    <div class="mt-8 border-t pt-6 text-xs text-muted-foreground">
+      <details>
+        <summary class="cursor-pointer">Debugging info</summary>
+        <div class="mt-2">
+          <ClientDebugger client:load />
+        </div>
+      </details>
     </div>
   </div>
 </MainLayout>

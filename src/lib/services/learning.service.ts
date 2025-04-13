@@ -47,14 +47,83 @@ export async function startLearningSession(
       throw new Error("User ID is required to start a learning session");
     }
 
-    // Fetch user's flashcards
-    console.log(`Fetching flashcards for user ${userId}`);
+    // Pobieramy fiszki użytkownika
+    let flashcardsQuery = supabase.from("flashcards").select("id, front_content").eq("user_id", userId);
     
-    const { data: userFlashcards, error: userFlashcardsError } = await supabase
-      .from("flashcards")
-      .select("id, front_content")
-      .eq("user_id", userId)
-      .limit(options.limit || 20);
+    // Jeśli wybrano tylko fiszki do powtórki, dodajemy odpowiednie filtry
+    if (options.only_due) {
+      console.log("Pobieranie tylko fiszek gotowych do powtórki");
+      
+      // Najpierw pobieramy IDs fiszek, które są gotowe do powtórki
+      const now = new Date();
+      const nowISOString = now.toISOString();
+      console.log(`Current time for due flashcards query: ${nowISOString}`);
+      
+      // Debugging: Sprawdź najbliższą powtórkę
+      const { data: nextReview, error: nextReviewError } = await supabase
+        .from("flashcard_reviews")
+        .select("flashcard_id, next_review_date, difficulty_rating")
+        .eq("user_id", userId)
+        .order("next_review_date", { ascending: true })
+        .limit(5);
+      
+      if (!nextReviewError && nextReview && nextReview.length > 0) {
+        console.log("Najbliższe powtórki:");
+        nextReview.forEach((review, index) => {
+          const reviewDate = new Date(review.next_review_date);
+          const secondsToReview = Math.floor((reviewDate.getTime() - now.getTime()) / 1000);
+          console.log(`  [${index + 1}] ID: ${review.flashcard_id}, data: ${review.next_review_date}, ocena: ${review.difficulty_rating}, za ${secondsToReview} sekund`);
+        });
+      }
+      
+      // Teraz pobieramy fiszki do powtórki - BEZ filtra is_correct
+      const { data: dueReviews, error: dueReviewsError } = await supabase
+        .from("flashcard_reviews")
+        .select("flashcard_id, next_review_date")
+        .eq("user_id", userId)
+        .lte("next_review_date", nowISOString)
+        .order("next_review_date", { ascending: true });
+      
+      if (dueReviewsError) {
+        console.error("Error fetching due flashcards:", dueReviewsError);
+        throw new Error(`Failed to fetch due flashcards: ${dueReviewsError.message}`);
+      }
+      
+      // Znajdź unikalne flashcard_id (eliminuj duplikaty)
+      const uniqueDueFlashcardIds = [...new Set(dueReviews.map(card => card.flashcard_id))];
+      
+      // Debugging: wyświetl znalezione fiszki do powtórki
+      if (dueReviews && dueReviews.length > 0) {
+        console.log(`Found ${dueReviews.length} flashcard reviews with ${uniqueDueFlashcardIds.length} unique flashcards due for review:`);
+        dueReviews.forEach((review, index) => {
+          if (index < 5) { // limit logs to first 5 for brevity
+            console.log(`  [${index + 1}] ID: ${review.flashcard_id}, due: ${review.next_review_date}`);
+          }
+        });
+      } else {
+        console.log("No flashcards found due for review at this time");
+      }
+      
+      // Jeśli nie ma fiszek do powtórki, zwracamy pustą listę
+      if (!dueReviews || uniqueDueFlashcardIds.length === 0) {
+        console.log("No flashcards due for review");
+        return {
+          session_id: null,
+          flashcards: [],
+        };
+      }
+      
+      // Filtrujemy fiszki według unikalnych IDs tych, które są gotowe do powtórki
+      flashcardsQuery = flashcardsQuery.in("id", uniqueDueFlashcardIds);
+      
+      console.log(`Found ${uniqueDueFlashcardIds.length} unique flashcards due for review`);
+    }
+    
+    // Dodajemy limit do zapytania
+    flashcardsQuery = flashcardsQuery.limit(options.limit || 20);
+    
+    // Wykonujemy zapytanie o fiszki
+    const { data: userFlashcards, error: userFlashcardsError } = await flashcardsQuery;
 
     if (userFlashcardsError) {
       console.error("Error fetching user flashcards:", userFlashcardsError);
@@ -86,6 +155,7 @@ export async function startLearningSession(
           flashcards_reviewed: 0,
           correct_answers: 0,
           incorrect_answers: 0,
+          is_due_only: options.only_due || false,
         })
         .select("id")
         .single();
@@ -221,8 +291,13 @@ export async function getDueFlashcardsCount(
   try {
     const { userId, today } = input;
 
-    // Format today as YYYY-MM-DD
-    const todayStr = today.toISOString().split("T")[0];
+    // Format today's full timestamp for accurate comparison
+    const nowISOString = today.toISOString();
+    
+    console.log(`Szukam fiszek do powtórki dla aktualnego czasu: ${nowISOString}`);
+    
+    // Format today as YYYY-MM-DD for day-based calculations
+    const todayStr = nowISOString.split("T")[0];
 
     // Calculate tomorrow and 7 days from today
     const tomorrow = new Date(today);
@@ -246,24 +321,62 @@ export async function getDueFlashcardsCount(
 
     // Extract flashcard IDs into an array
     const flashcardIds = userFlashcards.map((card) => card.id);
+    
+    if (flashcardIds.length === 0) {
+      console.log("Nie znaleziono żadnych fiszek dla tego użytkownika");
+      return { dueToday: 0, dueNextWeek: { total: 0, byDay: [] } };
+    }
 
-    // Query 1: Get count of flashcards due today
-    const { count: dueTodayCount, error: todayError } = await supabase
+    // ZMIANA: Pobierz UNIKALNE flashcard_id, które są do powtórki zamiast liczyć rekordy powtórek
+    // Najpierw pobierz wszystkie fiszki do powtórki
+    const { data: dueTodayFlashcards, error: todayError } = await supabase
       .from("flashcard_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("is_correct", true)
-      .lte("next_review_date", `${todayStr}T23:59:59`)
+      .select("flashcard_id, next_review_date")
+      .lte("next_review_date", nowISOString)
       .in("flashcard_id", flashcardIds);
 
     if (todayError) {
-      throw new Error(`Failed to fetch due today count: ${todayError.message}`);
+      throw new Error(`Failed to fetch due today flashcards: ${todayError.message}`);
+    }
+
+    // Znajdź unikalne flashcard_id (eliminuj duplikaty)
+    const uniqueDueFlashcardIds = [...new Set(dueTodayFlashcards.map(card => card.flashcard_id))];
+    const dueTodayCount = uniqueDueFlashcardIds.length;
+
+    console.log(`Znaleziono ${dueTodayFlashcards.length} rekordów powtórek i ${dueTodayCount} unikalnych fiszek do powtórki teraz (${nowISOString})`);
+
+    // Sprawdź najbliższą powtórkę dla debugowania
+    const { data: nextReview, error: nextReviewError } = await supabase
+      .from("flashcard_reviews")
+      .select("next_review_date, difficulty_rating, flashcard_id")
+      .in("flashcard_id", flashcardIds)
+      .order("next_review_date", { ascending: true })
+      .limit(3);
+
+    if (!nextReviewError && nextReview && nextReview.length > 0) {
+      console.log(`Najbliższe powtórki:`);
+      for (let i = 0; i < nextReview.length; i++) {
+        console.log(`[${i+1}] Fiszka: ${nextReview[i].flashcard_id}, zaplanowana na: ${nextReview[i].next_review_date}, ocena: ${nextReview[i].difficulty_rating}`);
+        
+        // Oblicz ile sekund do następnej powtórki
+        const nextReviewDate = new Date(nextReview[i].next_review_date);
+        const secondsToNextReview = Math.floor((nextReviewDate.getTime() - today.getTime()) / 1000);
+        
+        if (secondsToNextReview > 0) {
+          console.log(`  Do tej powtórki pozostało: ${secondsToNextReview} sekund (${Math.floor(secondsToNextReview/60)} minut i ${secondsToNextReview%60} sekund)`);
+        } else {
+          console.log(`  Ta powtórka jest już dostępna! (${secondsToNextReview} sekund temu)`);
+        }
+      }
+    } else {
+      console.log("Nie znaleziono żadnych zaplanowanych powtórek");
     }
 
     // Query 2: Get flashcards due in the next week
+    // ZMIANA: Pobierz UNIKALNE flashcard_id dla powtórek w następnym tygodniu
     const { data: nextWeekCards, error: weekError } = await supabase
       .from("flashcard_reviews")
-      .select("next_review_date")
-      .eq("is_correct", true)
+      .select("flashcard_id, next_review_date")
       .gte("next_review_date", `${tomorrowStr}T00:00:00`)
       .lte("next_review_date", `${nextWeekStr}T23:59:59`)
       .in("flashcard_id", flashcardIds);
@@ -272,33 +385,35 @@ export async function getDueFlashcardsCount(
       throw new Error(`Failed to fetch next week due cards: ${weekError.message}`);
     }
 
-    // Group by day on the application side
-    const dayCountMap = new Map<string, number>();
+    // Group by day on the application side, ale używając unikalnych flashcard_id
+    const dayCountMap = new Map<string, Set<string>>();
 
-    // Initialize days with 0 count
+    // Initialize days with empty sets
     for (let i = 0; i < 7; i++) {
       const date = new Date(tomorrow);
       date.setDate(date.getDate() + i);
       const dateStr = date.toISOString().split("T")[0];
-      dayCountMap.set(dateStr, 0);
+      dayCountMap.set(dateStr, new Set<string>());
     }
 
-    // Count flashcards by day
+    // Count unique flashcards by day
     for (const card of nextWeekCards) {
       const dateStr = new Date(card.next_review_date).toISOString().split("T")[0];
-      dayCountMap.set(dateStr, (dayCountMap.get(dateStr) || 0) + 1);
+      const daySet = dayCountMap.get(dateStr) || new Set<string>();
+      daySet.add(card.flashcard_id);
+      dayCountMap.set(dateStr, daySet);
     }
 
     // Convert map to array format expected by the interface
-    const byDayArray = Array.from(dayCountMap).map(([date, count]) => ({
+    const byDayArray = Array.from(dayCountMap).map(([date, flashcardSet]) => ({
       date,
-      count,
+      count: flashcardSet.size,
     }));
 
     // Sort by date
     byDayArray.sort((a, b) => a.date.localeCompare(b.date));
 
-    // Calculate total for next week
+    // Calculate total unique flashcards for next week
     const nextWeekTotal = byDayArray.reduce((sum, day) => sum + day.count, 0);
 
     // Format the response

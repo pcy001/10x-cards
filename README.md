@@ -148,6 +148,14 @@ Key metrics for success:
 - 50% reduction in time needed to create 10 flashcards compared to manual creation
 - Average learning session of at least 5 minutes
 
+## Inicjalizacja bazy danych
+
+Po każdym resecie lub nowej instalacji bazy danych, należy uruchomić skrypt inicjalizacyjny, który doda potrzebne kolumny:
+
+```bash
+cd /Users/pcy/Repo/x10-cards && docker exec -i supabase_db_x10-cards psql -U postgres < supabase/seed.sql
+```
+
 ## License
 
 This project is proprietary software and all rights are reserved. The source code is not available for redistribution or use outside of the official deployment.

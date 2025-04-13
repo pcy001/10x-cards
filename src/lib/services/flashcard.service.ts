@@ -229,33 +229,37 @@ export async function reviewFlashcard(
 
     // Calculate next review date using the difficulty rating
     const now = new Date();
-    const nextReviewDate = new Date();
+    const nextReviewDate = new Date(now); // Klonuj aktualny czas
 
-    // Tymczasowy algorytm powtórek z bardzo krótkimi interwałami (do testów)
+    // Algorytm powtórek z krótkimi interwałami według wymagań
     switch (reviewData.difficulty_rating) {
       case "nie_pamietam":
-        // Powtórka za 60 sekund
-        nextReviewDate.setSeconds(now.getSeconds() + 60);
+        // Natychmiastowa powtórka - ustaw next_review_date na teraz
+        nextReviewDate.setTime(now.getTime());
         break;
       case "trudne":
-        // Powtórka za 2 minuty
-        nextReviewDate.setMinutes(now.getMinutes() + 2);
+        // Powtórka za 1 minutę
+        nextReviewDate.setMinutes(nextReviewDate.getMinutes() + 1);
         break;
       case "srednie":
-        // Powtórka za 3 minuty
-        nextReviewDate.setMinutes(now.getMinutes() + 3);
+        // Powtórka za 2 minuty
+        nextReviewDate.setMinutes(nextReviewDate.getMinutes() + 2);
         break;
       case "latwe":
-        // Powtórka za 5 minut
-        nextReviewDate.setMinutes(now.getMinutes() + 5);
+        // Powtórka za 3 minuty
+        nextReviewDate.setMinutes(nextReviewDate.getMinutes() + 3);
         break;
       default:
-        // Domyślnie za 60 sekund, jeśli coś poszło nie tak
-        nextReviewDate.setSeconds(now.getSeconds() + 60);
+      // Domyślnie natychmiastowa powtórka
+      // Nie zmieniamy czasu - jest już ustawiony na "teraz"
     }
 
-    // Przygotuj dane recenzji do wstawienia
-    const reviewInsertData: {
+    console.log(
+      `Następna powtórka zaplanowana na: ${nextReviewDate.toISOString()} (za ${(nextReviewDate.getTime() - now.getTime()) / 1000} sekund)`
+    );
+
+    // Przygotuj dane recenzji
+    const reviewData2Update: {
       user_id: UUID;
       flashcard_id: UUID;
       difficulty_rating: string;
@@ -274,12 +278,46 @@ export async function reviewFlashcard(
 
     // Dodaj session_id tylko jeśli został podany
     if (reviewData.session_id) {
-      reviewInsertData.session_id = reviewData.session_id;
+      reviewData2Update.session_id = reviewData.session_id;
     }
 
     try {
-      // Zapisz recenzję w bazie danych
-      const { error: reviewError } = await supabase.from("flashcard_reviews").insert(reviewInsertData);
+      // ZMIANA: Najpierw sprawdź czy istnieje rekord powtórki dla tej fiszki i użytkownika
+      const { data: existingReview, error: existingReviewError } = await supabase
+        .from("flashcard_reviews")
+        .select("id")
+        .eq("flashcard_id", flashcardId)
+        .eq("user_id", userId)
+        .order("review_date", { ascending: false })
+        .limit(1);
+
+      if (existingReviewError) {
+        console.error("Błąd podczas sprawdzania istniejącej recenzji:", existingReviewError);
+        // Kontynuuj tworzenie nowego rekordu
+      }
+
+      let reviewError;
+
+      if (existingReview && existingReview.length > 0) {
+        // Aktualizuj istniejący rekord powtórki
+        const { error: updateError } = await supabase
+          .from("flashcard_reviews")
+          .update(reviewData2Update)
+          .eq("id", existingReview[0].id);
+
+        reviewError = updateError;
+        if (!updateError) {
+          console.log(`Zaktualizowano recenzję dla fiszki ${flashcardId} z oceną ${reviewData.difficulty_rating}`);
+        }
+      } else {
+        // Utwórz nowy rekord jeśli nie istnieje
+        const { error: insertError } = await supabase.from("flashcard_reviews").insert(reviewData2Update);
+
+        reviewError = insertError;
+        if (!insertError) {
+          console.log(`Utworzono nową recenzję dla fiszki ${flashcardId} z oceną ${reviewData.difficulty_rating}`);
+        }
+      }
 
       if (reviewError) {
         console.error("Błąd podczas zapisywania recenzji:", reviewError);

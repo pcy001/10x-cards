@@ -1,5 +1,8 @@
 ---
 import MainLayout from "@/layouts/MainLayout.astro";
+
+// Pobierz parametr only_due z query string
+const onlyDue = Astro.url.searchParams.get("only_due") === "true";
 ---
 
 <MainLayout title="Rozpoczynanie nauki | 10xCards">
@@ -8,13 +11,17 @@ import MainLayout from "@/layouts/MainLayout.astro";
       <div class="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-6"></div>
       <h1 class="text-2xl font-bold mb-2">Przygotowywanie sesji nauki</h1>
       <p class="text-muted-foreground mb-8">
-        Trwa ładowanie fiszek do powtórki...
+        {onlyDue ? "Trwa ładowanie fiszek do powtórki..." : "Trwa ładowanie wszystkich fiszek..."}
       </p>
     </div>
   </div>
 </MainLayout>
 
 <script>
+  // Pobierz wartość only_due z query string
+  const urlParams = new URLSearchParams(window.location.search);
+  const onlyDue = urlParams.get("only_due") === "true";
+
   // Rozpocznij sesję nauki po załadowaniu strony
   document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -22,7 +29,10 @@ import MainLayout from "@/layouts/MainLayout.astro";
       const response = await fetch('/api/learning/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 20 })
+        body: JSON.stringify({ 
+          limit: 20,
+          only_due: onlyDue 
+        })
       });
       
       if (!response.ok) {
@@ -38,7 +48,12 @@ import MainLayout from "@/layouts/MainLayout.astro";
       
       // Jeśli nie ma fiszek do nauki
       if (Array.isArray(data.flashcards) && data.flashcards.length === 0) {
-        window.location.href = '/dashboard?noFlashcards=true';
+        // Jeśli wybrano tylko fiszki do powtórki, dodaj odpowiedni parametr do URL
+        if (onlyDue) {
+          window.location.href = '/dashboard?noFlashcardsDue=true';
+        } else {
+          window.location.href = '/dashboard?noFlashcards=true';
+        }
         return;
       }
       
