@@ -1,8 +1,160 @@
 ---
 import MainLayout from "@/layouts/MainLayout.astro";
-import { SessionSummaryContainer } from "@/components/learning/summary";
+
+// Verify user is logged in
+const supabase = Astro.locals.supabase;
+const { data: { session } } = await supabase.auth.getSession();
+
+if (!session) {
+  return Astro.redirect("/login");
+}
+
+// Get session ID from query params
+const sessionId = Astro.url.searchParams.get("session_id");
+const isEmpty = Astro.url.searchParams.get("empty") === "true";
+
+// If no session ID and not empty, redirect to dashboard
+if (!sessionId && !isEmpty) {
+  return Astro.redirect("/dashboard");
+}
+
+// If we have a session ID, fetch the session data
+let sessionData = null;
+if (sessionId) {
+  try {
+    const response = await fetch(`${Astro.url.origin}/api/learning/sessions/${sessionId}`, {
+      headers: {
+        Cookie: Astro.request.headers.get("cookie") || ""
+      }
+    });
+    
+    if (response.ok) {
+      sessionData = await response.json();
+      console.log("Data otrzymane z API:", JSON.stringify(sessionData, null, 2));
+    }
+  } catch (error) {
+    console.error("Error fetching session data:", error);
+  }
+}
 ---
 
-<MainLayout title="Podsumowanie sesji nauki | 10xCards">
-  <SessionSummaryContainer client:load />
+<MainLayout title="Podsumowanie nauki | 10xCards">
+  <div class="container mx-auto p-6 max-w-3xl">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold mb-2">Podsumowanie sesji nauki</h1>
+      <p class="text-muted-foreground">
+        Sprawdź, jak poszła Ci nauka z fiszkami
+      </p>
+    </div>
+
+    {isEmpty && (
+      <div class="border rounded-lg bg-card p-8 text-center">
+        <div class="mx-auto w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+        </div>
+        <h2 class="text-xl font-bold mb-2">Brak fiszek do powtórki</h2>
+        <p class="text-muted-foreground mb-6">
+          Nie masz jeszcze żadnych fiszek do powtórki. Dodaj nowe fiszki, aby rozpocząć naukę.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a
+            href="/flashcards/create"
+            class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Dodaj fiszkę
+          </a>
+          <a
+            href="/dashboard"
+            class="px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+            Wróć do dashboardu
+          </a>
+        </div>
+      </div>
+    )}
+
+    {!isEmpty && sessionData && (
+      <div class="space-y-6">
+        <div class="bg-card border rounded-lg p-6 shadow-sm">
+          <h2 class="text-xl font-bold mb-4">Podsumowanie</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="border rounded-lg p-4 text-center">
+              <p class="text-muted-foreground text-sm mb-1">Fiszki przeglądnięte</p>
+              <p class="text-3xl font-bold">{sessionData.session_summary?.flashcards_reviewed || 0}</p>
+            </div>
+            <div class="border rounded-lg p-4 text-center">
+              <p class="text-muted-foreground text-sm mb-1">Poprawne odpowiedzi</p>
+              <p class="text-3xl font-bold text-green-600">{sessionData.session_summary?.correct_answers || 0}</p>
+            </div>
+            <div class="border rounded-lg p-4 text-center">
+              <p class="text-muted-foreground text-sm mb-1">Błędne odpowiedzi</p>
+              <p class="text-3xl font-bold text-red-600">{sessionData.session_summary?.incorrect_answers || 0}</p>
+            </div>
+          </div>
+          
+          <div class="h-8 bg-gray-100 rounded-full overflow-hidden">
+            {sessionData.session_summary?.flashcards_reviewed > 0 && (
+              <div 
+                class="h-full bg-primary" 
+                style={`width: ${Math.round((sessionData.session_summary?.correct_answers / sessionData.session_summary?.flashcards_reviewed) * 100)}%`}
+              ></div>
+            )}
+          </div>
+          <p class="text-center mt-2 text-sm text-muted-foreground">
+            Skuteczność: {sessionData.session_summary?.flashcards_reviewed > 0 
+              ? Math.round((sessionData.session_summary?.correct_answers / sessionData.session_summary?.flashcards_reviewed) * 100) 
+              : 0}%
+          </p>
+        </div>
+        
+        <div class="flex justify-center gap-3 mt-6">
+          <a
+            href="/learning/session"
+            class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-repeat"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg>
+            Nowa sesja
+          </a>
+          <a
+            href="/dashboard"
+            class="px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+            Wróć do dashboardu
+          </a>
+        </div>
+      </div>
+    )}
+
+    {!isEmpty && !sessionData && (
+      <div class="border rounded-lg bg-card p-8 text-center">
+        <div class="mx-auto w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+        </div>
+        <h2 class="text-xl font-bold mb-2">Nie udało się pobrać danych sesji</h2>
+        <p class="text-muted-foreground mb-6">
+          Wystąpił problem podczas pobierania informacji o Twojej sesji nauki.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+          <a
+            href="/learning/session"
+            class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-repeat"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg>
+            Rozpocznij nową sesję
+          </a>
+          <a
+            href="/dashboard"
+            class="px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+            Wróć do dashboardu
+          </a>
+        </div>
+      </div>
+    )}
+  </div>
 </MainLayout> 

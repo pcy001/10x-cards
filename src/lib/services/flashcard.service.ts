@@ -203,101 +203,151 @@ export async function reviewFlashcard(
       throw new Error("Flashcard not found");
     }
 
-    // Optional: Verify that the session exists and belongs to the user
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("learning_sessions")
-      .select("id")
-      .eq("id", reviewData.session_id)
-      .eq("user_id", userId)
-      .single();
+    // Sprawdź sesję tylko jeśli session_id jest podane
+    if (reviewData.session_id) {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase
+          .from("learning_sessions")
+          .select("id")
+          .eq("id", reviewData.session_id)
+          .eq("user_id", userId)
+          .single();
 
-    if (sessionError || !sessionData) {
-      throw new Error("Invalid session");
-    }
-
-    // Get the previous review to determine the interval
-    const { data: previousReview, error: previousReviewError } = await supabase
-      .from("flashcard_reviews")
-      .select("next_review_date, review_date")
-      .eq("flashcard_id", flashcardId)
-      .order("review_date", { ascending: false })
-      .limit(1);
-
-    if (previousReviewError) {
-      console.warn("Error fetching previous review:", previousReviewError);
-      // Continue execution despite this error
-    }
-
-    // Calculate previous interval in days (if available)
-    let previousInterval = 0;
-    if (previousReview && previousReview.length > 0) {
-      const prevReviewDate = new Date(previousReview[0].review_date);
-      const prevNextReviewDate = new Date(previousReview[0].next_review_date);
-      // Calculate difference in days
-      const diffTime = Math.abs(prevNextReviewDate.getTime() - prevReviewDate.getTime());
-      previousInterval = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
-
-    const now = new Date();
-
-    // Call the database function to calculate the next review date
-    const { data: nextReviewData, error: calcError } = await supabase.rpc("calculate_next_review_date", {
-      p_current_date: now.toISOString(),
-      p_difficulty_rating: reviewData.difficulty_rating,
-      p_previous_interval: previousInterval,
-    });
-
-    if (calcError) {
-      console.error("Error calculating next review date:", calcError);
-      throw new Error(`Failed to calculate next review date: ${calcError.message}`);
-    }
-
-    // Convert the response to Date
-    const nextReviewDate = nextReviewData ? new Date(nextReviewData) : new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-    // Try to use RPC function if it exists (single transaction)
-    try {
-      const { error } = await supabase.rpc("submit_flashcard_review", {
-        p_flashcard_id: flashcardId,
-        p_is_correct: reviewData.is_correct,
-        p_difficulty_rating: reviewData.difficulty_rating,
-        p_next_review_date: nextReviewDate.toISOString(),
-        p_session_id: reviewData.session_id,
-      });
-
-      if (error) {
-        // Fall back to direct database operations if RPC function doesn't exist yet
-        throw error;
+        if (sessionError || !sessionData) {
+          console.warn(
+            `Sesja ${reviewData.session_id} nie została znaleziona lub nie należy do użytkownika. Kontynuuję bez śledzenia sesji.`
+          );
+          // Kontynuujemy bez session_id
+          reviewData.session_id = undefined;
+        }
+      } catch (sessionError) {
+        console.warn(`Błąd podczas weryfikacji sesji: ${sessionError}. Kontynuuję bez śledzenia sesji.`);
+        // Kontynuujemy bez session_id
+        reviewData.session_id = undefined;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
-      // Ignore the specific error and fall back to direct operations
-      console.warn("RPC function submit_flashcard_review not available, falling back to direct operations");
+    }
 
-      // Insert the review record
-      const { error: reviewError } = await supabase.from("flashcard_reviews").insert({
-        flashcard_id: flashcardId,
-        difficulty_rating: reviewData.difficulty_rating,
-        is_correct: reviewData.is_correct,
-        review_date: now.toISOString(),
-        next_review_date: nextReviewDate.toISOString(),
-      });
+    // Calculate next review date using the difficulty rating
+    const now = new Date();
+    const nextReviewDate = new Date();
+
+    // Tymczasowy algorytm powtórek z bardzo krótkimi interwałami (do testów)
+    switch (reviewData.difficulty_rating) {
+      case "nie_pamietam":
+        // Powtórka za 60 sekund
+        nextReviewDate.setSeconds(now.getSeconds() + 60);
+        break;
+      case "trudne":
+        // Powtórka za 2 minuty
+        nextReviewDate.setMinutes(now.getMinutes() + 2);
+        break;
+      case "srednie":
+        // Powtórka za 3 minuty
+        nextReviewDate.setMinutes(now.getMinutes() + 3);
+        break;
+      case "latwe":
+        // Powtórka za 5 minut
+        nextReviewDate.setMinutes(now.getMinutes() + 5);
+        break;
+      default:
+        // Domyślnie za 60 sekund, jeśli coś poszło nie tak
+        nextReviewDate.setSeconds(now.getSeconds() + 60);
+    }
+
+    // Przygotuj dane recenzji do wstawienia
+    const reviewInsertData: {
+      user_id: UUID;
+      flashcard_id: UUID;
+      difficulty_rating: string;
+      is_correct: boolean;
+      review_date: string;
+      next_review_date: string;
+      session_id?: UUID;
+    } = {
+      user_id: userId,
+      flashcard_id: flashcardId,
+      difficulty_rating: reviewData.difficulty_rating,
+      is_correct: reviewData.is_correct,
+      review_date: now.toISOString(),
+      next_review_date: nextReviewDate.toISOString(),
+    };
+
+    // Dodaj session_id tylko jeśli został podany
+    if (reviewData.session_id) {
+      reviewInsertData.session_id = reviewData.session_id;
+    }
+
+    try {
+      // Zapisz recenzję w bazie danych
+      const { error: reviewError } = await supabase.from("flashcard_reviews").insert(reviewInsertData);
 
       if (reviewError) {
-        throw new Error(`Failed to insert review: ${reviewError.message}`);
-      }
+        console.error("Błąd podczas zapisywania recenzji:", reviewError);
+        // Kontynuuj mimo błędu, żeby nie blokować użytkownika
+      } else {
+        console.log(`Zapisano recenzję dla fiszki ${flashcardId} z oceną ${reviewData.difficulty_rating}`);
 
-      // If the answer is correct, increment the correct_answers_count
-      if (reviewData.is_correct) {
-        const { error: updateError } = await supabase
-          .from("flashcards")
-          .update({ correct_answers_count: supabase.rpc("increment_counter", { row_id: flashcardId }) })
-          .eq("id", flashcardId);
+        // Aktualizuj statystyki sesji, jeśli podano session_id
+        if (reviewData.session_id) {
+          try {
+            // Najpierw wykonujemy wywołania RPC do inkrementacji
+            await supabase.rpc("increment", {
+              table: "learning_sessions",
+              column: "flashcards_reviewed",
+              row_id: reviewData.session_id,
+              amount: 1,
+            });
 
-        if (updateError) {
-          console.error("Error updating correct answers count:", updateError);
-          // Continue execution despite this error
+            // Następnie aktualizujemy odpowiednie liczniki w zależności od poprawności odpowiedzi
+            if (reviewData.is_correct) {
+              await supabase.rpc("increment", {
+                table: "learning_sessions",
+                column: "correct_answers",
+                row_id: reviewData.session_id,
+                amount: 1,
+              });
+            } else {
+              await supabase.rpc("increment", {
+                table: "learning_sessions",
+                column: "incorrect_answers",
+                row_id: reviewData.session_id,
+                amount: 1,
+              });
+            }
+
+            console.log(
+              `Zaktualizowano statystyki sesji ${reviewData.session_id} (przeglądnięto: +1, ${reviewData.is_correct ? "poprawne: +1" : "niepoprawne: +1"})`
+            );
+          } catch (sessionUpdateError) {
+            console.error("Błąd podczas aktualizacji statystyk sesji:", sessionUpdateError);
+            // Kontynuuj mimo błędu
+          }
         }
+      }
+    } catch (insertError) {
+      console.error("Błąd podczas zapisywania recenzji:", insertError);
+      // Kontynuuj mimo błędu, żeby nie blokować użytkownika
+    }
+
+    // If the answer is correct, increment the correct_answers_count on the flashcard
+    if (reviewData.is_correct) {
+      try {
+        // First get the current count
+        const { data: currentCountData } = await supabase
+          .from("flashcards")
+          .select("correct_answers_count")
+          .eq("id", flashcardId)
+          .single();
+
+        if (currentCountData) {
+          const newCount = (currentCountData.correct_answers_count || 0) + 1;
+          await supabase.from("flashcards").update({ correct_answers_count: newCount }).eq("id", flashcardId);
+
+          console.log(`Zaktualizowano licznik poprawnych odpowiedzi dla fiszki ${flashcardId} do ${newCount}`);
+        }
+      } catch (updateError) {
+        console.error("Błąd aktualizacji licznika poprawnych odpowiedzi:", updateError);
+        // Kontynuuj mimo błędu
       }
     }
 

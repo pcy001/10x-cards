@@ -1,8 +1,322 @@
 ---
 import MainLayout from "@/layouts/MainLayout.astro";
-import LearningSessionContainer from "@/components/learning/LearningSessionContainer";
+
+// Verify user is logged in
+const supabase = Astro.locals.supabase;
+const { data: { session } } = await supabase.auth.getSession();
+
+if (!session) {
+  return Astro.redirect("/login");
+}
 ---
 
-<MainLayout title="Nauka z fiszkami | 10xCards">
-  <LearningSessionContainer client:load />
-</MainLayout> 
+<MainLayout title="Nauka | 10xCards">
+  <div id="app" class="container mx-auto p-6 max-w-2xl">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold mb-2">Nauka z fiszkami</h1>
+      <p class="text-muted-foreground">
+        Przeglądaj fiszki i zaznaczaj, jak dobrze je pamiętasz
+      </p>
+    </div>
+
+    <div id="loading" class="flex flex-col items-center justify-center h-64">
+      <div class="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      <p class="mt-4 text-muted-foreground">Ładowanie sesji nauki...</p>
+    </div>
+
+    <div id="no-cards" class="hidden border rounded-lg bg-card p-8 text-center">
+      <div class="mx-auto w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+      </div>
+      <h2 class="text-xl font-bold mb-2">Brak fiszek do powtórki</h2>
+      <p class="text-muted-foreground mb-6">
+        Nie masz jeszcze żadnych fiszek do powtórki. Dodaj nowe fiszki, aby rozpocząć naukę.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a
+          href="/flashcards/create"
+          class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Dodaj fiszkę
+        </a>
+        <a
+          href="/dashboard"
+          class="px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 flex items-center justify-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+          Wróć do dashboardu
+        </a>
+      </div>
+    </div>
+
+    <div id="session" class="hidden">
+      <div class="bg-card border rounded-lg p-6 shadow-sm mb-8">
+        <div class="flex justify-between items-center mb-4">
+          <span class="text-sm text-muted-foreground">
+            Fiszka <span id="current-card-index">1</span> z <span id="total-cards">0</span>
+          </span>
+          <span id="session-progress" class="text-sm text-muted-foreground">0%</span>
+        </div>
+
+        <div id="flashcard" class="h-64 border rounded-lg p-6 flex items-center justify-center relative cursor-pointer">
+          <div id="front-content" class="text-lg text-center font-medium"></div>
+          <div id="back-content" class="text-lg text-center font-medium hidden"></div>
+          <button id="flip-button" class="absolute bottom-4 right-4 text-muted-foreground hover:text-primary" title="Odwróć fiszkę">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 0 1 9-9"></path><path d="M21 12a9 9 0 0 1-9 9"></path><path d="m6 9-3 3 3 3"></path><path d="m18 15 3-3-3-3"></path></svg>
+          </button>
+        </div>
+
+        <div id="difficulty-buttons" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 hidden">
+          <button data-difficulty="nie_pamietam" class="bg-red-100 hover:bg-red-200 text-red-800 py-3 px-4 rounded-lg font-medium">
+            Nie pamiętam
+          </button>
+          <button data-difficulty="trudne" class="bg-orange-100 hover:bg-orange-200 text-orange-800 py-3 px-4 rounded-lg font-medium">
+            Trudne
+          </button>
+          <button data-difficulty="srednie" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 py-3 px-4 rounded-lg font-medium">
+            Średnie
+          </button>
+          <button data-difficulty="latwe" class="bg-green-100 hover:bg-green-200 text-green-800 py-3 px-4 rounded-lg font-medium">
+            Łatwe
+          </button>
+        </div>
+      </div>
+
+      <div class="flex justify-between">
+        <button id="end-session-button" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
+          Zakończ sesję
+        </button>
+      </div>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  // Variables
+  let sessionId = null;
+  let flashcards = [];
+  let currentCardIndex = 0;
+  let isCardFlipped = false;
+
+  // DOM Elements
+  const loadingEl = document.getElementById('loading');
+  const noCardsEl = document.getElementById('no-cards');
+  const sessionEl = document.getElementById('session');
+  const frontContentEl = document.getElementById('front-content');
+  const backContentEl = document.getElementById('back-content');
+  const currentCardIndexEl = document.getElementById('current-card-index');
+  const totalCardsEl = document.getElementById('total-cards');
+  const sessionProgressEl = document.getElementById('session-progress');
+  const flashcardEl = document.getElementById('flashcard');
+  const flipButtonEl = document.getElementById('flip-button');
+  const difficultyButtonsEl = document.getElementById('difficulty-buttons');
+  const endSessionButtonEl = document.getElementById('end-session-button');
+
+  // Initialize session
+  async function initSession() {
+    try {
+      // Start a learning session
+      const response = await fetch('/api/learning/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          limit: 20 // Limit to 20 flashcards per session
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error starting learning session: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Check if we have flashcards to review, regardless of session_id
+      if (!data.flashcards || data.flashcards.length === 0) {
+        // No cards available for learning
+        loadingEl.classList.add('hidden');
+        noCardsEl.classList.remove('hidden');
+        return;
+      }
+
+      // Store session data
+      sessionId = data.session_id;
+      flashcards = data.flashcards;
+      
+      if (!sessionId) {
+        console.warn('Learning without session tracking due to session creation issue');
+      }
+      
+      // Update UI
+      totalCardsEl.textContent = flashcards.length;
+      currentCardIndexEl.textContent = 1;
+      sessionProgressEl.textContent = '0%';
+      
+      // Show the first card
+      showCard(0);
+      
+      // Hide loading, show session
+      loadingEl.classList.add('hidden');
+      sessionEl.classList.remove('hidden');
+    } catch (error) {
+      console.error('Error initializing session:', error);
+      alert('Wystąpił błąd podczas uruchamiania sesji nauki. Spróbuj ponownie później.');
+      window.location.href = '/dashboard';
+    }
+  }
+
+  // Show card at given index
+  function showCard(index) {
+    if (index >= flashcards.length) {
+      // End of session
+      endSession();
+      return;
+    }
+
+    const card = flashcards[index];
+    frontContentEl.textContent = card.front_content;
+    
+    // Reset card state
+    isCardFlipped = false;
+    frontContentEl.classList.remove('hidden');
+    backContentEl.classList.add('hidden');
+    difficultyButtonsEl.classList.add('hidden');
+    
+    // Update progress
+    currentCardIndexEl.textContent = index + 1;
+    const progress = Math.floor((index / flashcards.length) * 100);
+    sessionProgressEl.textContent = `${progress}%`;
+  }
+
+  // Flip card to show back content
+  async function flipCard() {
+    if (isCardFlipped) return;
+    
+    try {
+      const currentCard = flashcards[currentCardIndex];
+      
+      // Get the full flashcard content
+      const response = await fetch(`/api/flashcards/${currentCard.id}/review`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching flashcard: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Show back content
+      backContentEl.textContent = data.back_content;
+      frontContentEl.classList.add('hidden');
+      backContentEl.classList.remove('hidden');
+      difficultyButtonsEl.classList.remove('hidden');
+      
+      isCardFlipped = true;
+    } catch (error) {
+      console.error('Error flipping card:', error);
+      alert('Wystąpił błąd podczas pobierania treści fiszki.');
+    }
+  }
+
+  // Submit card review
+  async function submitReview(difficultyRating) {
+    if (!isCardFlipped) return;
+    
+    try {
+      const currentCard = flashcards[currentCardIndex];
+      
+      // Submit review
+      const response = await fetch(`/api/flashcards/${currentCard.id}/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          difficulty_rating: difficultyRating,
+          is_correct: difficultyRating !== 'nie_pamietam', // Only "nie_pamietam" is considered incorrect
+          session_id: sessionId
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error submitting review: ${response.statusText}`);
+      }
+      
+      // Move to next card
+      currentCardIndex++;
+      showCard(currentCardIndex);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      alert('Wystąpił błąd podczas zapisywania oceny.');
+    }
+  }
+
+  // End learning session
+  async function endSession() {
+    try {
+      if (!sessionId) {
+        window.location.href = '/learning/summary?empty=true';
+        return;
+      }
+      
+      // End the session
+      const response = await fetch(`/api/learning/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error ending session: ${response.statusText}`);
+      }
+      
+      // Redirect to summary page
+      window.location.href = `/learning/summary?session_id=${sessionId}`;
+    } catch (error) {
+      console.error('Error ending session:', error);
+      alert('Wystąpił błąd podczas kończenia sesji.');
+      window.location.href = '/dashboard';
+    }
+  }
+
+  // Event listeners
+  document.addEventListener('DOMContentLoaded', () => {
+    // Initialize session on page load
+    initSession();
+    
+    // Flip card on click
+    if (flashcardEl) {
+      flashcardEl.addEventListener('click', flipCard);
+    }
+    
+    if (flipButtonEl) {
+      flipButtonEl.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent triggering the flashcard click event
+        flipCard();
+      });
+    }
+    
+    // Difficulty buttons
+    if (difficultyButtonsEl) {
+      const buttons = difficultyButtonsEl.querySelectorAll('button');
+      buttons.forEach(button => {
+        button.addEventListener('click', () => {
+          const difficulty = button.getAttribute('data-difficulty');
+          submitReview(difficulty);
+        });
+      });
+    }
+    
+    // End session button
+    if (endSessionButtonEl) {
+      endSessionButtonEl.addEventListener('click', endSession);
+    }
+  });
+</script> 

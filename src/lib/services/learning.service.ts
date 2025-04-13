@@ -41,10 +41,15 @@ export async function startLearningSession(
   console.log(`Starting learning session for user ${userId} with options:`, options);
 
   try {
-    // Zamiast używać funkcji RPC, pobierz fiszki bezpośrednio z tabeli
-    console.log(`Checking for flashcards due for review for user ${userId}`);
+    // Check if userId is provided and valid
+    if (!userId) {
+      console.error("No user ID provided for learning session");
+      throw new Error("User ID is required to start a learning session");
+    }
+
+    // Fetch user's flashcards
+    console.log(`Fetching flashcards for user ${userId}`);
     
-    // Najpierw pobierz wszystkie fiszki użytkownika
     const { data: userFlashcards, error: userFlashcardsError } = await supabase
       .from("flashcards")
       .select("id, front_content")
@@ -56,8 +61,8 @@ export async function startLearningSession(
       throw new Error(`Failed to fetch user flashcards: ${userFlashcardsError.message}`);
     }
 
-    // Jeśli nie ma fiszek, zwróć pustą tablicę bez tworzenia sesji
-    if (!userFlashcards || !Array.isArray(userFlashcards) || userFlashcards.length === 0) {
+    // If no flashcards found, return empty response
+    if (!userFlashcards || userFlashcards.length === 0) {
       console.log("No flashcards found for user");
       return {
         session_id: null,
@@ -65,43 +70,48 @@ export async function startLearningSession(
       };
     }
 
-    // Skoro są fiszki, utwórz sesję nauki
+    // Create learning session
     console.log(`Creating learning session for ${userFlashcards.length} flashcards`);
+    const now = new Date().toISOString();
+    
+    let sessionId = null;
+    
+    try {
+      const { data: sessionData, error: sessionError } = await supabase
+        .from("learning_sessions")
+        .insert({
+          user_id: userId,
+          started_at: now,
+          flashcards_count: userFlashcards.length,
+          flashcards_reviewed: 0,
+          correct_answers: 0,
+          incorrect_answers: 0,
+        })
+        .select("id")
+        .single();
 
-    // Create a new learning session
-    const { data: sessionData, error: sessionError } = await supabase
-      .from("learning_sessions")
-      .insert({
-        user_id: userId,
-        started_at: new Date().toISOString(),
-        flashcards_count: userFlashcards.length,
-        flashcards_reviewed: 0,
-        correct_answers: 0,
-        incorrect_answers: 0,
-      })
-      .select("id")
-      .single();
-
-    if (sessionError) {
-      console.error("Session creation error:", sessionError);
-      throw new Error(`Failed to create learning session: ${sessionError.message}`);
+      if (sessionError) {
+        console.error("Session creation error:", sessionError);
+        // Continue without session ID
+      } else if (!sessionData || !sessionData.id) {
+        console.error("No session data returned");
+        // Continue without session ID
+      } else {
+        sessionId = sessionData.id;
+        console.log(`Created learning session with ID: ${sessionId}`);
+      }
+    } catch (sessionError) {
+      console.error("Error creating session:", sessionError);
+      // Continue without session ID
     }
 
-    if (!sessionData || !sessionData.id) {
-      console.error("No session data returned:", sessionData);
-      throw new Error("Failed to create learning session: No session ID returned");
-    }
-
-    const sessionId = sessionData.id;
-    console.log(`Created learning session with ID: ${sessionId}`);
-
-    // Convert database results to DTOs
+    // Prepare flashcards for learning
     const flashcards: LearningSessionFlashcardDto[] = userFlashcards.map(card => ({
       id: card.id,
       front_content: card.front_content,
     }));
 
-    console.log(`Retrieved ${flashcards.length} flashcards for review`);
+    console.log(`Retrieved ${flashcards.length} flashcards for review${sessionId ? ` with session ID: ${sessionId}` : ' without session tracking'}`);
 
     return {
       session_id: sessionId,
@@ -127,76 +137,73 @@ export async function endLearningSession(
   userId: UUID,
   sessionId: UUID
 ): Promise<EndLearningSessionResponseDto> {
-  // Check if the session exists and belongs to the user
-  const { data: sessionData, error: sessionError } = await supabase
-    .from("learning_sessions")
-    .select("id, started_at, flashcards_count")
-    .match({ id: sessionId, user_id: userId })
-    .single();
+  try {
+    // Check if the session exists and belongs to the user
+    const { data: sessionData, error: sessionError } = await supabase
+      .from("learning_sessions")
+      .select("id, started_at, flashcards_count")
+      .match({ id: sessionId, user_id: userId })
+      .single();
 
-  if (sessionError) {
-    if (sessionError.code === "PGRST116") {
-      throw new Error(`Session not found: ${sessionId}`);
+    if (sessionError) {
+      if (sessionError.code === "PGRST116") {
+        throw new Error(`Session not found: ${sessionId}`);
+      }
+      throw new Error(`Failed to get learning session: ${sessionError.message}`);
     }
-    throw new Error(`Failed to get learning session: ${sessionError.message}`);
+
+    const endedAt = new Date();
+
+    // Get flashcard review statistics for this session
+    const { data: reviewStats, error: reviewStatsError } = await supabase
+      .from("flashcard_reviews")
+      .select("is_correct")
+      .eq("session_id", sessionId)
+      .eq("user_id", userId);
+
+    if (reviewStatsError) {
+      throw new Error(`Failed to get review statistics: ${reviewStatsError.message}`);
+    }
+
+    // Calculate statistics
+    const flashcardsReviewed = reviewStats ? reviewStats.length : 0;
+    const correctAnswers = reviewStats ? reviewStats.filter((review) => review.is_correct).length : 0;
+    const incorrectAnswers = flashcardsReviewed - correctAnswers;
+    const completionPercentage =
+      sessionData.flashcards_count > 0 ? Math.round((flashcardsReviewed / sessionData.flashcards_count) * 100) : 0;
+
+    // Calculate duration in seconds
+    const startedAt = new Date(sessionData.started_at);
+    const durationSeconds = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
+
+    // Update the session to mark it as ended with the calculated statistics
+    const { error: updateError } = await supabase
+      .from("learning_sessions")
+      .update({
+        ended_at: endedAt.toISOString(),
+        flashcards_reviewed: flashcardsReviewed,
+        correct_answers: correctAnswers,
+        incorrect_answers: incorrectAnswers,
+      })
+      .eq("id", sessionId);
+
+    if (updateError) {
+      throw new Error(`Failed to update learning session: ${updateError.message}`);
+    }
+
+    return {
+      session_summary: {
+        flashcards_reviewed: flashcardsReviewed,
+        correct_answers: correctAnswers,
+        incorrect_answers: incorrectAnswers,
+        completion_percentage: completionPercentage,
+        duration_seconds: durationSeconds,
+      },
+    };
+  } catch (error) {
+    console.error("Error in endLearningSession:", error);
+    throw error;
   }
-
-  const endedAt = new Date();
-
-  // Update the session to mark it as ended
-  const { error: updateError } = await supabase
-    .from("learning_sessions")
-    .update({
-      ended_at: endedAt.toISOString(),
-    })
-    .eq("id", sessionId);
-
-  if (updateError) {
-    throw new Error(`Failed to update learning session: ${updateError.message}`);
-  }
-
-  // Get flashcard review statistics for this session
-  const { data: reviewStats, error: reviewStatsError } = await supabase
-    .from("flashcard_reviews")
-    .select("is_correct")
-    .gte("review_date", sessionData.started_at)
-    .lte("review_date", endedAt.toISOString())
-    .eq("user_id", userId);
-
-  if (reviewStatsError) {
-    throw new Error(`Failed to get review statistics: ${reviewStatsError.message}`);
-  }
-
-  // Calculate statistics
-  const flashcardsReviewed = reviewStats.length;
-  const correctAnswers = reviewStats.filter((review) => review.is_correct).length;
-  const incorrectAnswers = flashcardsReviewed - correctAnswers;
-  const completionPercentage =
-    sessionData.flashcards_count > 0 ? Math.round((flashcardsReviewed / sessionData.flashcards_count) * 100) : 0;
-
-  // Calculate duration in seconds
-  const startedAt = new Date(sessionData.started_at);
-  const durationSeconds = Math.round((endedAt.getTime() - startedAt.getTime()) / 1000);
-
-  // Update the session with the calculated statistics
-  await supabase
-    .from("learning_sessions")
-    .update({
-      flashcards_reviewed: flashcardsReviewed,
-      correct_answers: correctAnswers,
-      incorrect_answers: incorrectAnswers,
-    })
-    .eq("id", sessionId);
-
-  return {
-    session_summary: {
-      flashcards_reviewed: flashcardsReviewed,
-      correct_answers: correctAnswers,
-      incorrect_answers: incorrectAnswers,
-      completion_percentage: completionPercentage,
-      duration_seconds: durationSeconds,
-    },
-  };
 }
 
 /**
@@ -325,7 +332,7 @@ export async function getSessionSummary(
   // Check if the session exists and belongs to the user
   const { data: sessionData, error: sessionError } = await supabase
     .from("learning_sessions")
-    .select("id, started_at, ended_at, flashcards_count")
+    .select("id, started_at, ended_at, flashcards_count, flashcards_reviewed, correct_answers, incorrect_answers")
     .match({ id: sessionId, user_id: userId })
     .single();
 
@@ -337,27 +344,14 @@ export async function getSessionSummary(
   }
 
   // Make sure the session has ended
-  if (!sessionData.ended_at) {
-    // If not ended, let's calculate duration from now
-    sessionData.ended_at = new Date().toISOString();
-  }
-
-  // Get flashcard review statistics for this session
-  const { data: reviewStats, error: reviewStatsError } = await supabase
-    .from("flashcard_reviews")
-    .select("is_correct")
-    .gte("review_date", sessionData.started_at)
-    .lte("review_date", sessionData.ended_at)
-    .eq("user_id", userId);
-
-  if (reviewStatsError) {
-    throw new Error(`Failed to get review statistics: ${reviewStatsError.message}`);
-  }
-
-  // Calculate statistics
-  const flashcardsReviewed = reviewStats.length;
-  const correctAnswers = reviewStats.filter((review) => review.is_correct).length;
-  const incorrectAnswers = flashcardsReviewed - correctAnswers;
+  const endTime = sessionData.ended_at 
+    ? new Date(sessionData.ended_at).getTime()
+    : new Date().getTime();
+  
+  // Pobierz wartości bezpośrednio z tabeli learning_sessions
+  const flashcardsReviewed = sessionData.flashcards_reviewed || 0;
+  const correctAnswers = sessionData.correct_answers || 0;
+  const incorrectAnswers = sessionData.incorrect_answers || 0;
 
   // Calculate completion percentage
   const completionPercentage =
@@ -365,7 +359,6 @@ export async function getSessionSummary(
 
   // Calculate duration in seconds
   const startTime = new Date(sessionData.started_at).getTime();
-  const endTime = new Date(sessionData.ended_at).getTime();
   const durationSeconds = Math.round((endTime - startTime) / 1000);
 
   return {

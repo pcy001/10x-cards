@@ -84,7 +84,7 @@ export type SessionIdParam = z.infer<typeof sessionIdParamSchema>;
 export const reviewFlashcardSchema = z.object({
   difficulty_rating: z.enum(["nie_pamietam", "trudne", "srednie", "latwe"]),
   is_correct: z.boolean(),
-  session_id: z.string().uuid("Session ID must be a valid UUID"),
+  session_id: z.string().uuid("Session ID must be a valid UUID").optional(),
 });
 
 export type ReviewFlashcardInput = z.infer<typeof reviewFlashcardSchema>;
@@ -94,14 +94,8 @@ export type ReviewFlashcardInput = z.infer<typeof reviewFlashcardSchema>;
  * Ensures content meets length requirements
  */
 export const createFlashcardSchema = z.object({
-  front_content: z
-    .string()
-    .min(1, "Przód fiszki jest wymagany")
-    .max(500, "Maksymalna długość to 500 znaków"),
-  back_content: z
-    .string()
-    .min(1, "Tył fiszki jest wymagany")
-    .max(200, "Maksymalna długość to 200 znaków"),
+  front_content: z.string().min(1, "Przód fiszki jest wymagany").max(500, "Maksymalna długość to 500 znaków"),
+  back_content: z.string().min(1, "Tył fiszki jest wymagany").max(200, "Maksymalna długość to 200 znaków"),
 });
 
 export type CreateFlashcardInput = z.infer<typeof createFlashcardSchema>;
