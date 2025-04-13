@@ -1,0 +1,193 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Logowanie | 10xCards">
+  <div class="min-h-[calc(100vh-140px)] flex items-center justify-center py-12 px-4">
+    <div class="w-full max-w-md space-y-8">
+      <!-- Logo i nagłówek -->
+      <div class="text-center">
+        <img src="/logo.svg" alt="10xCards" class="h-12 mx-auto mb-4" />
+        <h1 class="text-2xl font-bold">Logowanie do 10xCards</h1>
+        <p class="mt-2 text-muted-foreground">
+          Zaloguj się, aby kontynuować naukę
+        </p>
+      </div>
+
+      <!-- Formularz logowania -->
+      <div class="bg-card p-6 shadow-sm rounded-lg border">
+        <form id="login-form" class="space-y-4">
+          <!-- Email -->
+          <div>
+            <label for="email" class="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              class="w-full p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+              placeholder="Twój adres email"
+            />
+          </div>
+
+          <!-- Hasło -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="password" class="block text-sm font-medium">Hasło</label>
+            </div>
+            <div class="relative">
+              <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                class="w-full p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+                placeholder="Twoje hasło"
+              />
+              <button
+                type="button"
+                id="toggle-password"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Komunikat o błędzie -->
+          <div id="error-message" class="hidden p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-200"></div>
+          
+          <!-- Powiadomienie o udanej rejestracji -->
+          <div id="registration-success" class="hidden p-3 bg-green-50 text-green-600 text-sm rounded-md border border-green-200">
+            Konto zostało utworzone! Możesz się teraz zalogować.
+            <button id="dismiss-success" class="ml-2 text-green-700 hover:underline">Zamknij</button>
+          </div>
+
+          <!-- Przycisk logowania -->
+          <button
+            type="submit"
+            id="submit-button"
+            class="w-full bg-primary text-white font-medium p-2 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          >
+            Zaloguj się
+          </button>
+        </form>
+      </div>
+
+      <!-- Link do rejestracji -->
+      <div class="text-center">
+        <p class="text-sm text-muted-foreground">
+          Nie masz jeszcze konta?
+          <a href="/auth/register" class="text-primary hover:underline">Zarejestruj się</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Pobranie elementów formularza
+  const loginForm = document.getElementById('login-form');
+  const emailInput = document.getElementById('email') as HTMLInputElement;
+  const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const togglePasswordButton = document.getElementById('toggle-password');
+  const submitButton = document.getElementById('submit-button') as HTMLButtonElement;
+  const errorMessage = document.getElementById('error-message');
+  const registrationSuccess = document.getElementById('registration-success');
+  const dismissSuccessButton = document.getElementById('dismiss-success');
+
+  // Sprawdzenie, czy w URL jest informacja o udanej rejestracji
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.has('registered') && searchParams.get('registered') === 'true') {
+    registrationSuccess.classList.remove('hidden');
+    
+    // Usuń parametr z URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('registered');
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  // Obsługa przycisku do ukrywania/pokazywania hasła
+  togglePasswordButton.addEventListener('click', () => {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      togglePasswordButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
+    } else {
+      passwordInput.type = 'password';
+      togglePasswordButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+  });
+
+  // Obsługa przycisku zamykania powiadomienia o udanej rejestracji
+  if (dismissSuccessButton) {
+    dismissSuccessButton.addEventListener('click', () => {
+      registrationSuccess.classList.add('hidden');
+    });
+  }
+
+  // Obsługa wysłania formularza
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    // Walidacja formularza
+    if (!emailInput.value) {
+      showError('Email jest wymagany');
+      return;
+    }
+    
+    if (!passwordInput.value) {
+      showError('Hasło jest wymagane');
+      return;
+    }
+    
+    // Zmiana stanu przycisku na ładowanie
+    submitButton.disabled = true;
+    submitButton.textContent = 'Logowanie...';
+    errorMessage.classList.add('hidden');
+    
+    try {
+      // Wysłanie żądania do API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailInput.value,
+          password: passwordInput.value
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        if (response.status === 401) {
+          showError('Nieprawidłowy email lub hasło');
+          return;
+        }
+        
+        showError(errorData.message || 'Wystąpił błąd podczas logowania');
+        return;
+      }
+      
+      const data = await response.json();
+      
+      // Zapisanie tokenu sesji
+      localStorage.setItem('auth_token', data.session.access_token);
+      
+      // Przekierowanie do dashboardu
+      window.location.href = '/dashboard';
+      
+    } catch (error) {
+      showError('Wystąpił nieoczekiwany błąd. Spróbuj ponownie później.');
+    } finally {
+      // Przywrócenie stanu przycisku
+      submitButton.disabled = false;
+      submitButton.textContent = 'Zaloguj się';
+    }
+  });
+  
+  // Funkcja wyświetlająca komunikat o błędzie
+  function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.remove('hidden');
+  }
+</script> 

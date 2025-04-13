@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
-import { acceptFlashcardsSchema } from "../../../lib/validation/schemas";
-import { saveAcceptedFlashcards } from "../../../lib/services/flashcard.service";
-import type { AcceptFlashcardsResponseDto } from "../../../types";
+import type { AcceptFlashcardsResponseDto } from "@/types";
+import { acceptFlashcardsSchema } from "@/lib/validation/schemas";
+import { saveAcceptedFlashcards } from "@/lib/services/flashcard.service";
 
 export const prerender = false;
 
@@ -10,55 +10,71 @@ export const prerender = false;
  * Saves user-selected flashcards to their permanent collection
  */
 export const POST: APIRoute = async ({ request, locals }) => {
-  // Check authentication
-  const supabase = locals.supabase;
-  const { data: sessionData } = await supabase.auth.getSession();
-
-  if (!sessionData.session) {
-    return new Response(JSON.stringify({ error: "Authentication required" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const userId = sessionData.session.user.id;
-
   try {
-    // Parse and validate request body
-    const body = await request.json();
-    const result = acceptFlashcardsSchema.safeParse(body);
+    // Pobierz klienta Supabase
+    const supabase = locals.supabase;
 
+    // Sprawdź, czy użytkownik jest zalogowany
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({
+          error: "Authentication required",
+          message: "Musisz być zalogowany, aby zapisać fiszki",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Pobranie danych z żądania
+    const body = await request.json();
+
+    // Walidacja danych wejściowych z użyciem Zod
+    const result = acceptFlashcardsSchema.safeParse(body);
     if (!result.success) {
       return new Response(
         JSON.stringify({
           error: "Invalid input",
           details: result.error.format(),
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
       );
     }
 
-    const { flashcards } = result.data;
+    // Zapisz fiszki w bazie danych
+    const acceptedFlashcards = await saveAcceptedFlashcards(supabase, user.id, result.data.flashcards);
 
-    // Save flashcards to the database
-    const savedFlashcards = await saveAcceptedFlashcards(supabase, userId, flashcards);
-
-    // Return the saved flashcards
     const response: AcceptFlashcardsResponseDto = {
-      accepted_count: savedFlashcards.length,
-      flashcards: savedFlashcards,
+      accepted_count: acceptedFlashcards.length,
+      flashcards: acceptedFlashcards,
     };
 
-    return new Response(JSON.stringify(response), { status: 201, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("Error accepting flashcards:", error);
+    console.error("Błąd podczas zapisywania fiszek:", error);
 
     return new Response(
       JSON.stringify({
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error occurred",
+        message: error instanceof Error ? error.message : "Wystąpił nieznany błąd podczas zapisywania fiszek",
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     );
   }
 };

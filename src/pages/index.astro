@@ -1,8 +1,22 @@
 ---
-import Welcome from "../components/Welcome.astro";
-import Layout from "../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
+import Welcome from "@/components/Welcome.astro";
+import AuthCleanup from "@/components/AuthCleanup.jsx";
+
+// Sprawdź czy użytkownik jest zalogowany
+const supabase = Astro.locals.supabase;
+const {
+  data: { session },
+} = await supabase.auth.getSession();
+const isLoggedIn = !!session;
+
+// Przekieruj na dashboard, jeśli użytkownik jest zalogowany
+if (isLoggedIn) {
+  return Astro.redirect("/dashboard");
+}
 ---
 
-<Layout>
+<Layout title="10xCards - Strona główna">
   <Welcome />
+  <AuthCleanup client:load />
 </Layout>

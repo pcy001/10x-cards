@@ -1,0 +1,232 @@
+---
+import Layout from "@/layouts/Layout.astro";
+---
+
+<Layout title="Rejestracja | 10xCards">
+  <div class="min-h-[calc(100vh-140px)] flex items-center justify-center py-12 px-4">
+    <div class="w-full max-w-md space-y-8">
+      <!-- Logo i nagłówek -->
+      <div class="text-center">
+        <img src="/logo.svg" alt="10xCards" class="h-12 mx-auto mb-4" />
+        <h1 class="text-2xl font-bold">Zarejestruj się w 10xCards</h1>
+        <p class="mt-2 text-muted-foreground">
+          Stwórz konto, aby rozpocząć efektywną naukę
+        </p>
+      </div>
+
+      <!-- Formularz rejestracji -->
+      <div class="bg-card p-6 shadow-sm rounded-lg border">
+        <form id="register-form" class="space-y-4">
+          <!-- Email -->
+          <div>
+            <label for="email" class="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              class="w-full p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+              placeholder="Twój adres email"
+            />
+          </div>
+
+          <!-- Hasło -->
+          <div>
+            <label for="password" class="block text-sm font-medium mb-1">Hasło</label>
+            <div class="relative">
+              <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                class="w-full p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+                placeholder="Minimum 6 znaków"
+              />
+              <button
+                type="button"
+                id="toggle-password"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Potwierdzenie hasła -->
+          <div>
+            <label for="confirm-password" class="block text-sm font-medium mb-1">Potwierdź hasło</label>
+            <div class="relative">
+              <input
+                type="password"
+                id="confirm-password"
+                name="confirm-password"
+                required
+                class="w-full p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary focus:outline-none"
+                placeholder="Powtórz hasło"
+              />
+              <button
+                type="button"
+                id="toggle-confirm-password"
+                class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Komunikat o błędzie -->
+          <div id="error-message" class="hidden p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-200"></div>
+
+          <!-- Przycisk rejestracji -->
+          <button
+            type="submit"
+            id="submit-button"
+            class="w-full bg-primary text-white font-medium p-2 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          >
+            Zarejestruj się
+          </button>
+        </form>
+      </div>
+
+      <!-- Link do logowania -->
+      <div class="text-center">
+        <p class="text-sm text-muted-foreground">
+          Masz już konto?
+          <a href="/auth/login" class="text-primary hover:underline">Zaloguj się</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Pobranie elementów formularza
+  const registerForm = document.getElementById('register-form');
+  const emailInput = document.getElementById('email') as HTMLInputElement;
+  const passwordInput = document.getElementById('password') as HTMLInputElement;
+  const confirmPasswordInput = document.getElementById('confirm-password') as HTMLInputElement;
+  const togglePasswordButton = document.getElementById('toggle-password');
+  const toggleConfirmPasswordButton = document.getElementById('toggle-confirm-password');
+  const submitButton = document.getElementById('submit-button') as HTMLButtonElement;
+  const errorMessage = document.getElementById('error-message');
+
+  // Obsługa przycisku do ukrywania/pokazywania hasła
+  togglePasswordButton.addEventListener('click', () => {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      togglePasswordButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
+    } else {
+      passwordInput.type = 'password';
+      togglePasswordButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+  });
+
+  // Obsługa przycisku do ukrywania/pokazywania potwierdzenia hasła
+  toggleConfirmPasswordButton.addEventListener('click', () => {
+    if (confirmPasswordInput.type === 'password') {
+      confirmPasswordInput.type = 'text';
+      toggleConfirmPasswordButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>';
+    } else {
+      confirmPasswordInput.type = 'password';
+      toggleConfirmPasswordButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+  });
+
+  // Walidacja formularza
+  function validateForm() {
+    // Reset błędów
+    errorMessage.classList.add('hidden');
+    
+    // Sprawdzenie czy email został podany
+    if (!emailInput.value) {
+      showError('Email jest wymagany');
+      return false;
+    }
+    
+    // Sprawdzenie poprawności formatu emaila
+    if (!/\S+@\S+\.\S+/.test(emailInput.value)) {
+      showError('Podaj poprawny adres email');
+      return false;
+    }
+    
+    // Sprawdzenie czy hasło zostało podane
+    if (!passwordInput.value) {
+      showError('Hasło jest wymagane');
+      return false;
+    }
+    
+    // Sprawdzenie długości hasła
+    if (passwordInput.value.length < 6) {
+      showError('Hasło musi mieć co najmniej 6 znaków');
+      return false;
+    }
+    
+    // Sprawdzenie czy potwierdzenie hasła zostało podane
+    if (!confirmPasswordInput.value) {
+      showError('Potwierdź hasło');
+      return false;
+    }
+    
+    // Sprawdzenie czy hasła są takie same
+    if (passwordInput.value !== confirmPasswordInput.value) {
+      showError('Hasła nie są identyczne');
+      return false;
+    }
+    
+    return true;
+  }
+
+  // Obsługa wysłania formularza
+  registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    // Walidacja formularza
+    if (!validateForm()) {
+      return;
+    }
+    
+    // Zmiana stanu przycisku na ładowanie
+    submitButton.disabled = true;
+    submitButton.textContent = 'Rejestracja...';
+    
+    try {
+      // Wysłanie żądania do API
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailInput.value,
+          password: passwordInput.value
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        if (response.status === 409) {
+          showError('Ten adres email jest już używany');
+          return;
+        }
+        
+        showError(errorData.message || 'Wystąpił błąd podczas rejestracji');
+        return;
+      }
+      
+      // Przekierowanie do strony logowania z informacją o pomyślnej rejestracji
+      window.location.href = '/auth/login?registered=true';
+      
+    } catch (error) {
+      showError('Wystąpił nieoczekiwany błąd. Spróbuj ponownie później.');
+    } finally {
+      // Przywrócenie stanu przycisku
+      submitButton.disabled = false;
+      submitButton.textContent = 'Zarejestruj się';
+    }
+  });
+  
+  // Funkcja wyświetlająca komunikat o błędzie
+  function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.remove('hidden');
+  }
+</script> 

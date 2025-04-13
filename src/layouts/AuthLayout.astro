@@ -1,0 +1,28 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = "Autoryzacja | 10xCards" } = Astro.props;
+---
+
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body class="bg-background min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+      <div class="flex flex-col items-center mb-8">
+        <div class="mb-4">
+          <img src="/logo.svg" alt="10xCards Logo" class="h-12" />
+        </div>
+        <h1 class="text-2xl font-bold text-foreground">{title}</h1>
+      </div>
+      <div class="bg-card shadow-sm border rounded-lg p-6">
+        <slot />
+      </div>
+    </div>
+  </body>
+</html>

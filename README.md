@@ -1,6 +1,64 @@
 # 10xCards
 
-A web application for quickly creating educational flashcards using artificial intelligence. 10xCards enables users to generate flashcards from pasted text, manually edit them, manage their collection, and learn using a spaced repetition algorithm.
+Aplikacja do nauki z fiszkami z wykorzystaniem nowoczesnych technologii.
+
+## Struktura aplikacji
+
+### Dashboard
+
+Dashboard jest głównym widokiem aplikacji po zalogowaniu. Zawiera kilka kluczowych sekcji:
+
+- **Sekcja powitalna** - Personalizowane powitanie użytkownika i krótki opis aplikacji.
+- **Fiszki do powtórki** - Podsumowanie fiszek oczekujących na powtórzenie, z podziałem na kategorie.
+- **Szybkie akcje** - Przyciski umożliwiające szybki dostęp do kluczowych funkcji aplikacji.
+
+### Komponenty
+
+Aplikacja zbudowana jest z modułowych komponentów zgodnych z zasadami Atomic Design:
+
+- **UI Components** - Podstawowe elementy interfejsu: przyciski, karty, pola formularzy.
+- **Composite Components** - Złożone komponenty łączące elementy podstawowe w funkcjonalne bloki.
+- **Page Components** - Komponenty stron, zarządzające układem i stanem.
+
+## Tech Stack
+
+- **Astro** - Meta-framework do budowy aplikacji webowych
+- **React** - Biblioteka do tworzenia interaktywnych komponentów
+- **TypeScript** - Typowany superset JavaScript
+- **Tailwind CSS** - Utility-first framework CSS
+- **Shadcn/ui** - Komponenty UI zbudowane na Radix UI i Tailwind
+- **TanStack Query** - Biblioteka do zarządzania stanem i zapytaniami
+
+## Uruchomienie aplikacji
+
+```bash
+# Instalacja zależności
+npm install
+
+# Uruchomienie serwera deweloperskiego
+npm run dev
+
+# Budowanie aplikacji
+npm run build
+
+# Uruchomienie zbudowanej aplikacji
+npm run preview
+```
+
+## Struktura projektu
+
+```
+src/
+├── api/            # Endpointy API (Astro)
+├── components/     # Komponenty React i Astro
+│   ├── dashboard/  # Komponenty dashboardu
+│   └── ui/         # Podstawowe komponenty UI
+├── hooks/          # Custom hooks
+├── layouts/        # Layouty Astro
+├── lib/            # Biblioteki i utilities
+├── pages/          # Strony Astro
+└── types/          # Typy TypeScript
+```
 
 ## Project Description
 
@@ -13,30 +71,6 @@ A web application for quickly creating educational flashcards using artificial i
 - Learn efficiently with an integrated spaced repetition algorithm
 
 The application is designed for anyone who wants to create and learn from flashcards effectively, saving time on preparation.
-
-## Tech Stack
-
-### Frontend
-- Astro 5 - For building fast, efficient pages with minimal JavaScript
-- React 19 - For interactive components where needed
-- TypeScript 5 - For static typing and better IDE support
-- Tailwind 4 - For convenient styling
-- Shadcn/ui - For accessible React UI components
-
-### Backend
-- Supabase - Comprehensive backend solution providing:
-  - PostgreSQL database
-  - SDK for Backend-as-a-Service
-  - Built-in user authentication
-
-### AI
-- Openrouter.ai - For communication with various AI models:
-  - Access to models from OpenAI, Anthropic, Google, and others
-  - Financial limit settings for API keys
-
-### CI/CD & Hosting
-- GitHub Actions - For CI/CD pipelines
-- DigitalOcean - For application hosting via Docker
 
 ## Getting Started Locally
 

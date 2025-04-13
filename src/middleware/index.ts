@@ -1,30 +1,37 @@
 import { defineMiddleware } from "astro:middleware";
 import { supabaseClient } from "../db/supabase.client";
 
-export const onRequest = defineMiddleware(async (context, next) => {
-  // Set up default supabase client
-  context.locals.supabase = supabaseClient;
+// Adresy URL, które nie wymagają uwierzytelnienia
+const PUBLIC_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/logout",
+  "/",
+];
 
-  // Check for Authorization header with Bearer token
-  const authHeader = context.request.headers.get("Authorization");
-  const refreshToken = context.request.headers.get("X-Refresh-Token");
+export const onRequest = defineMiddleware(async ({ request, locals, redirect }, next) => {
+  // Dodaj klienta Supabase do kontekstu żądania
+  locals.supabase = supabaseClient;
 
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  // Sprawdź, czy ścieżka jest publiczna
+  const url = new URL(request.url);
+  const isPublicPath = PUBLIC_PATHS.some((path) => url.pathname === path || url.pathname.startsWith("/api/auth/"));
 
-    try {
-      // Set the session on the existing client
-      await supabaseClient.auth.setSession({
-        access_token: token,
-        refresh_token: refreshToken || "",
-      });
+  // Jeśli to nie jest ścieżka publiczna, sprawdź sesję
+  if (!isPublicPath) {
+    const {
+      data: { session },
+      error,
+    } = await supabaseClient.auth.getSession();
 
-      // Using the same client instance (following backend rules)
-      context.locals.supabase = supabaseClient;
-    } catch (error) {
-      console.error("Error setting auth session:", error);
+    if (error || !session) {
+      // Jeśli brak sesji, przekieruj do strony logowania
+      return redirect("/auth/login");
     }
   }
 
+  // Kontynuuj obsługę żądania
   return next();
 });

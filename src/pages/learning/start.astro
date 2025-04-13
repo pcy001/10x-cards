@@ -1,0 +1,56 @@
+---
+import MainLayout from "@/layouts/MainLayout.astro";
+---
+
+<MainLayout title="Rozpoczynanie nauki | 10xCards">
+  <div class="min-h-[calc(100vh-140px)] flex items-center justify-center py-12 px-4">
+    <div class="text-center">
+      <div class="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-6"></div>
+      <h1 class="text-2xl font-bold mb-2">Przygotowywanie sesji nauki</h1>
+      <p class="text-muted-foreground mb-8">
+        Trwa ładowanie fiszek do powtórki...
+      </p>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  // Rozpocznij sesję nauki po załadowaniu strony
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      // Wyślij żądanie utworzenia nowej sesji nauki
+      const response = await fetch('/api/learning/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 20 })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || 
+          errorData.error || 
+          `Nie udało się rozpocząć sesji nauki (${response.status})`
+        );
+      }
+      
+      const data = await response.json();
+      
+      // Jeśli nie ma fiszek do nauki
+      if (Array.isArray(data.flashcards) && data.flashcards.length === 0) {
+        window.location.href = '/dashboard?noFlashcards=true';
+        return;
+      }
+      
+      // Jeśli są fiszki do nauki, przekieruj do sesji nauki
+      window.location.href = '/learning/session';
+      
+    } catch (error) {
+      console.error('Błąd podczas rozpoczynania sesji nauki:', error);
+      
+      // W przypadku błędu przekieruj do strony głównej z informacją o błędzie
+      const errorMessage = error instanceof Error ? error.message : 'Nieznany błąd';
+      window.location.href = `/dashboard?error=${encodeURIComponent(errorMessage)}`;
+    }
+  });
+</script>

@@ -167,7 +167,7 @@ export interface LearningSessionFlashcardDto {
 }
 
 export interface StartLearningSessionResponseDto {
-  session_id: UUID;
+  session_id: UUID | null;
   flashcards: LearningSessionFlashcardDto[];
 }
 

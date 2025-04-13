@@ -28,6 +28,8 @@ export interface Database {
           is_correct: boolean;
           next_review_date: string;
           review_date: string;
+          user_id: string;
+          session_id: string | null;
         };
         Insert: {
           difficulty_rating: Database["public"]["Enums"]["difficulty_rating"];
@@ -36,6 +38,8 @@ export interface Database {
           is_correct: boolean;
           next_review_date: string;
           review_date?: string;
+          user_id: string;
+          session_id?: string | null;
         };
         Update: {
           difficulty_rating?: Database["public"]["Enums"]["difficulty_rating"];
@@ -44,6 +48,8 @@ export interface Database {
           is_correct?: boolean;
           next_review_date?: string;
           review_date?: string;
+          user_id?: string;
+          session_id?: string | null;
         };
         Relationships: [
           {
@@ -51,6 +57,13 @@ export interface Database {
             columns: ["flashcard_id"];
             isOneToOne: false;
             referencedRelation: "flashcards";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "flashcard_reviews_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "learning_sessions";
             referencedColumns: ["id"];
           },
         ];
@@ -82,6 +95,39 @@ export interface Database {
           id?: string;
           is_ai_generated?: boolean;
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      learning_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          started_at: string;
+          ended_at: string | null;
+          flashcards_count: number;
+          flashcards_reviewed: number;
+          correct_answers: number;
+          incorrect_answers: number;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          started_at?: string;
+          ended_at?: string | null;
+          flashcards_count?: number;
+          flashcards_reviewed?: number;
+          correct_answers?: number;
+          incorrect_answers?: number;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          started_at?: string;
+          ended_at?: string | null;
+          flashcards_count?: number;
+          flashcards_reviewed?: number;
+          correct_answers?: number;
+          incorrect_answers?: number;
         };
         Relationships: [];
       };

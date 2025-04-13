@@ -5,6 +5,10 @@ import type { LoginResponseDto } from "../../../types";
 
 export const prerender = false;
 
+/**
+ * POST handler dla logowania użytkownika
+ * Weryfikuje dane uwierzytelniające i zwraca informacje o sesji
+ */
 export const POST: APIRoute = async ({ request, locals }) => {
   const supabase = locals.supabase;
 
@@ -42,7 +46,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         return new Response(
           JSON.stringify({
             error: "Authentication failed",
-            message: "Invalid email or password",
+            message: "Nieprawidłowy email lub hasło",
           }),
           { status: 401, headers: { "Content-Type": "application/json" } }
         );
