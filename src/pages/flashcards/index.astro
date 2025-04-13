@@ -40,13 +40,26 @@ if (user) {
           Zarządzaj swoimi fiszkami, dodawaj nowe i organizuj swoją naukę
         </p>
       </div>
-      <a
-        href="/flashcards/generate"
-        class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center gap-2"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        Dodaj nowe fiszki
-      </a>
+      <div class="flex gap-2">
+        <a
+          href="/flashcards/create"
+          class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Dodaj fiszkę
+        </a>
+        <a
+          href="/flashcards/generate"
+          class="px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 flex items-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>
+          Generuj z AI
+        </a>
+      </div>
+    </div>
+
+    <div id="success-message" class="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg mb-6 hidden">
+      Fiszka została pomyślnie dodana!
     </div>
 
     {error && (
@@ -70,13 +83,20 @@ if (user) {
             </div>
             <h2 class="text-xl font-bold mb-2">Brak fiszek</h2>
             <p class="text-muted-foreground mb-6">
-              Nie masz jeszcze żadnych fiszek. Zacznij od wygenerowania fiszek z tekstu
-              lub dodaj je ręcznie.
+              Nie masz jeszcze żadnych fiszek. Zacznij od dodania własnej fiszki
+              lub wygenerowania fiszek z tekstu.
             </p>
             <div class="flex flex-col sm:flex-row gap-3 justify-center">
               <a
-                href="/flashcards/generate"
+                href="/flashcards/create"
                 class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                Dodaj fiszkę
+              </a>
+              <a
+                href="/flashcards/generate"
+                class="px-4 py-2 border border-primary text-primary rounded-md hover:bg-primary/10 flex items-center justify-center gap-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sparkles"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>
                 Wygeneruj fiszki z tekstu
@@ -116,6 +136,25 @@ if (user) {
   </div>
 
   <script>
+    // Check for flashcard creation success message
+    document.addEventListener('DOMContentLoaded', () => {
+      const successMessage = document.getElementById('success-message');
+      const wasFlashcardCreated = sessionStorage.getItem("flashcardCreated") === "true";
+      
+      if (wasFlashcardCreated && successMessage) {
+        // Show success message
+        successMessage.classList.remove('hidden');
+        
+        // Remove the flag from session storage
+        sessionStorage.removeItem("flashcardCreated");
+        
+        // Hide message after 5 seconds
+        setTimeout(() => {
+          successMessage.classList.add('hidden');
+        }, 5000);
+      }
+    });
+
     // Funkcja do usuwania fiszki
     document.querySelectorAll('.group button').forEach(button => {
       button.addEventListener('click', async (e) => {

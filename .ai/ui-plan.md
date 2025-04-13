@@ -86,13 +86,32 @@ Główna nawigacja w zabezpieczonej części będzie opierać się na prostym me
   - Lista fiszek z treścią przodu i tyłu (integracja z `/api/flashcards`)
   - Przyciski usuwania dla każdej fiszki
   - Paginacja listy
+  - Przycisk "Dodaj nową fiszkę" prowadzący do widoku dodawania fiszek
+  - Przycisk "Generuj fiszki" prowadzący do generatora fiszek
 - **UX/Dostępność/Bezpieczeństwo**:
   - Przejrzysty układ listy
   - Wyraźne oznaczenie akcji usuwania
   - Potwierdzenie usunięcia
   - Zabezpieczenie dostępu do fiszek użytkownika
 
-### 2.6. Sesja nauki
+### 2.6. Dodawanie fiszki
+- **Ścieżka**: `/flashcards/create`
+- **Główny cel**: Ręczne tworzenie nowych fiszek
+- **Kluczowe informacje**: Formularz z polami do wprowadzenia przodu i tyłu fiszki
+- **Kluczowe komponenty**:
+  - Formularz z polami tekstowymi dla przodu i tyłu fiszki
+  - Liczniki znaków pokazujące limit (500 znaków dla przodu, 200 dla tyłu)
+  - Przycisk "Zapisz fiszkę" (integracja z `/api/flashcards` POST)
+  - Przycisk "Anuluj" do powrotu do listy fiszek
+  - Komunikaty o błędach walidacji
+- **UX/Dostępność/Bezpieczeństwo**:
+  - Intuicyjny układ formularza
+  - Walidacja danych w czasie rzeczywistym
+  - Wyraźne oznaczenie pól wymaganych
+  - Informacja zwrotna o statusie operacji
+  - Zabezpieczenie przed przypadkową utratą danych
+
+### 2.7. Sesja nauki
 - **Ścieżka**: `/learning/session`
 - **Główny cel**: Nauka z wykorzystaniem fiszek i algorytmu powtórek
 - **Kluczowe informacje**: 
@@ -110,7 +129,7 @@ Główna nawigacja w zabezpieczonej części będzie opierać się na prostym me
   - Wyraźne przyciski oceny trudności
   - Zachowanie stanu sesji w przypadku przerwania
 
-### 2.7. Podsumowanie sesji nauki
+### 2.8. Podsumowanie sesji nauki
 - **Ścieżka**: `/learning/summary`
 - **Główny cel**: Przedstawienie statystyk po zakończonej sesji nauki
 - **Kluczowe informacje**: Podstawowe statystyki z sesji
@@ -159,6 +178,14 @@ Główna nawigacja w zabezpieczonej części będzie opierać się na prostym me
 2. Przegląda listę swoich fiszek
 3. Może usunąć wybrane fiszki
 
+### 3.5. Ręczne dodawanie fiszek
+1. Użytkownik przechodzi do widoku listy fiszek
+2. Wybiera opcję "Dodaj nową fiszkę"
+3. Wypełnia formularz, wprowadzając treść przodu i tyłu fiszki
+4. Klika przycisk "Zapisz fiszkę"
+5. System zapisuje fiszkę w bazie danych
+6. Użytkownik zostaje przekierowany do listy fiszek z komunikatem o pomyślnym dodaniu
+
 ## 4. Układ i struktura nawigacji
 
 Struktura nawigacji 10xCards będzie oparta na prostym, intuicyjnym układzie:
@@ -197,6 +224,7 @@ Struktura nawigacji 10xCards będzie oparta na prostym, intuicyjnym układzie:
 - **FlashcardList** - komponent listy fiszek z opcjami zarządzania
 - **FlashcardForm** - formularz do tworzenia/edycji fiszek
 - **FlashcardGenerator** - komponent generatora fiszek z AI
+- **CharCounter** - komponent licznika znaków dla pól tekstowych
 
 ### 5.3. Komponenty sesji nauki
 - **LearningSession** - główny komponent sesji nauki
@@ -211,7 +239,6 @@ Struktura nawigacji 10xCards będzie oparta na prostym, intuicyjnym układzie:
 - **Checkbox** - pole wyboru (do zaznaczania fiszek)
 - **LoadingIndicator** - wskaźnik ładowania dla operacji asynchronicznych
 - **ErrorDisplay** - komponent wyświetlający błędy (kody błędów)
-- **CharCounter** - licznik znaków dla pól tekstowych z limitem
 
 ### 5.5. Komponenty layoutu
 - **MainLayout** - główny układ dla zalogowanych użytkowników

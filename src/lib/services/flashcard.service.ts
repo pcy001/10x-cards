@@ -308,3 +308,44 @@ export async function reviewFlashcard(
     throw error;
   }
 }
+
+/**
+ * Creates a new flashcard manually entered by the user
+ *
+ * @param supabase - The authenticated Supabase client instance
+ * @param userId - The ID of the user creating the flashcard
+ * @param data - The flashcard data (front_content, back_content)
+ * @returns The created flashcard with its ID and metadata
+ * @throws Error if the database operation fails
+ */
+export async function createFlashcard(
+  supabase: SupabaseClient,
+  userId: UUID,
+  data: { front_content: string; back_content: string }
+) {
+  try {
+    // Create the flashcard in the database
+    const { data: flashcard, error } = await supabase
+      .from("flashcards")
+      .insert({
+        user_id: userId,
+        front_content: data.front_content,
+        back_content: data.back_content,
+        is_ai_generated: false,
+        correct_answers_count: 0,
+      })
+      .select("id, front_content, back_content, is_ai_generated, created_at, correct_answers_count")
+      .single();
+
+    // Handle errors
+    if (error) {
+      console.error("Error creating flashcard:", error);
+      throw new Error(`Failed to create flashcard: ${error.message}`);
+    }
+
+    return flashcard;
+  } catch (error) {
+    console.error("Error in createFlashcard:", error);
+    throw error;
+  }
+}

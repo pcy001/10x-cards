@@ -88,3 +88,20 @@ export const reviewFlashcardSchema = z.object({
 });
 
 export type ReviewFlashcardInput = z.infer<typeof reviewFlashcardSchema>;
+
+/**
+ * Schema for validating manual flashcard creation
+ * Ensures content meets length requirements
+ */
+export const createFlashcardSchema = z.object({
+  front_content: z
+    .string()
+    .min(1, "Przód fiszki jest wymagany")
+    .max(500, "Maksymalna długość to 500 znaków"),
+  back_content: z
+    .string()
+    .min(1, "Tył fiszki jest wymagany")
+    .max(200, "Maksymalna długość to 200 znaków"),
+});
+
+export type CreateFlashcardInput = z.infer<typeof createFlashcardSchema>;
