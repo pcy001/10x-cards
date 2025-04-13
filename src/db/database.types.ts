@@ -1,135 +1,117 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type Database = {
+export interface Database {
   graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
+    Tables: Record<never, never>;
+    Views: Record<never, never>;
     Functions: {
       graphql: {
         Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+          extensions?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: Record<never, never>;
+    CompositeTypes: Record<never, never>;
+  };
   public: {
     Tables: {
       flashcard_reviews: {
         Row: {
-          difficulty_rating: Database["public"]["Enums"]["difficulty_rating"]
-          flashcard_id: string
-          id: string
-          is_correct: boolean
-          next_review_date: string
-          review_date: string
-        }
+          difficulty_rating: Database["public"]["Enums"]["difficulty_rating"];
+          flashcard_id: string;
+          id: string;
+          is_correct: boolean;
+          next_review_date: string;
+          review_date: string;
+        };
         Insert: {
-          difficulty_rating: Database["public"]["Enums"]["difficulty_rating"]
-          flashcard_id: string
-          id?: string
-          is_correct: boolean
-          next_review_date: string
-          review_date?: string
-        }
+          difficulty_rating: Database["public"]["Enums"]["difficulty_rating"];
+          flashcard_id: string;
+          id?: string;
+          is_correct: boolean;
+          next_review_date: string;
+          review_date?: string;
+        };
         Update: {
-          difficulty_rating?: Database["public"]["Enums"]["difficulty_rating"]
-          flashcard_id?: string
-          id?: string
-          is_correct?: boolean
-          next_review_date?: string
-          review_date?: string
-        }
+          difficulty_rating?: Database["public"]["Enums"]["difficulty_rating"];
+          flashcard_id?: string;
+          id?: string;
+          is_correct?: boolean;
+          next_review_date?: string;
+          review_date?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "flashcard_reviews_flashcard_id_fkey"
-            columns: ["flashcard_id"]
-            isOneToOne: false
-            referencedRelation: "flashcards"
-            referencedColumns: ["id"]
+            foreignKeyName: "flashcard_reviews_flashcard_id_fkey";
+            columns: ["flashcard_id"];
+            isOneToOne: false;
+            referencedRelation: "flashcards";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       flashcards: {
         Row: {
-          back_content: string
-          correct_answers_count: number
-          created_at: string | null
-          front_content: string
-          id: string
-          is_ai_generated: boolean
-          user_id: string
-        }
+          back_content: string;
+          correct_answers_count: number;
+          created_at: string | null;
+          front_content: string;
+          id: string;
+          is_ai_generated: boolean;
+          user_id: string;
+        };
         Insert: {
-          back_content: string
-          correct_answers_count?: number
-          created_at?: string | null
-          front_content: string
-          id?: string
-          is_ai_generated?: boolean
-          user_id: string
-        }
+          back_content: string;
+          correct_answers_count?: number;
+          created_at?: string | null;
+          front_content: string;
+          id?: string;
+          is_ai_generated?: boolean;
+          user_id: string;
+        };
         Update: {
-          back_content?: string
-          correct_answers_count?: number
-          created_at?: string | null
-          front_content?: string
-          id?: string
-          is_ai_generated?: boolean
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
-    Views: {
-      [_ in never]: never
-    }
+          back_content?: string;
+          correct_answers_count?: number;
+          created_at?: string | null;
+          front_content?: string;
+          id?: string;
+          is_ai_generated?: boolean;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+    };
+    Views: Record<never, never>;
     Functions: {
       calculate_next_review_date: {
         Args: {
-          p_current_date: string
-          p_difficulty_rating: Database["public"]["Enums"]["difficulty_rating"]
-          p_previous_interval?: number
-        }
-        Returns: string
-      }
-    }
+          p_current_date: string;
+          p_difficulty_rating: Database["public"]["Enums"]["difficulty_rating"];
+          p_previous_interval?: number;
+        };
+        Returns: string;
+      };
+    };
     Enums: {
-      difficulty_rating: "nie_pamietam" | "trudne" | "srednie" | "latwe"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
+      difficulty_rating: "nie_pamietam" | "trudne" | "srednie" | "latwe";
+    };
+    CompositeTypes: Record<never, never>;
+  };
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
@@ -137,72 +119,64 @@ export type Tables<
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | { schema: keyof Database },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
   ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+  DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | { schema: keyof Database },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
@@ -210,14 +184,12 @@ export type Enums<
   ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+  PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof Database;
   }
     ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
@@ -225,7 +197,7 @@ export type CompositeTypes<
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   graphql_public: {
@@ -236,5 +208,4 @@ export const Constants = {
       difficulty_rating: ["nie_pamietam", "trudne", "srednie", "latwe"],
     },
   },
-} as const
-
+} as const;
