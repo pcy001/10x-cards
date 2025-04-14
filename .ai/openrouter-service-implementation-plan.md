@@ -2,29 +2,43 @@
 
 ## 1. Opis usługi
 
-Usługa OpenRouter będzie odpowiedzialna za komunikację z API OpenRouter w celu generowania fiszek na podstawie dostarczonego tekstu. Umożliwi wykorzystanie zaawansowanych modeli językowych do automatycznego tworzenia fiszek edukacyjnych bez konieczności ręcznego wprowadzania każdej fiszki przez użytkownika.
+Usługa OpenRouter będzie odpowiedzialna za komunikację z API OpenRouter, umożliwiając dostęp do różnych modeli LLM (Large Language Models) w celu generowania fiszek edukacyjnych na podstawie dostarczonych tekstów. OpenRouter działa jako agregator różnych dostawców AI (OpenAI, Anthropic, Google i innych), umożliwiając wybór modelu zapewniającego najlepszy stosunek wydajności do kosztów.
 
-Główne funkcjonalności usługi:
-- Generowanie fiszek na podstawie tekstu źródłowego
-- Dostosowanie generowania do określonego języka docelowego
-- Kontrola poziomu trudności generowanych fiszek
-- Dostosowanie typu generowanych fiszek (słownictwo, zwroty, definicje)
-- Obsługa limitów i ograniczeń API
+Główne funkcje usługi obejmują:
+- Komunikację z API OpenRouter za pomocą kluczy API
+- Wysyłanie odpowiednio skonstruowanych promptów do wybranych modeli
+- Żądanie odpowiedzi w ustrukturyzowanym formacie JSON (fiszki)
+- Parsowanie otrzymanych odpowiedzi do formatu aplikacji
+- Obsługę błędów i ponawianie nieudanych zapytań
+- Optymalizację kosztów przy zachowaniu wysokiej jakości generowanych fiszek
 
-Usługa będzie zintegrowana z istniejącym systemem fiszek i będzie wywoływana przez endpoint API `/api/flashcards/generate`.
+Usługa zostanie zaimplementowana w TypeScript jako moduł serwisowy, zgodnie z architekturą aplikacji 10xCards, i będzie wywoływana przez endpoint API `/api/flashcards/generate`.
 
 ## 2. Opis konstruktora
 
 ```typescript
 class OpenRouterService {
   private apiKey: string;
-  private baseUrl: string = "https://openrouter.ai/api/v1";
+  private baseUrl = "https://openrouter.ai/api/v1";
+  private defaultModel = "anthropic/claude-3-opus-20240229";
   
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || import.meta.env.OPENROUTER_API_KEY;
+  constructor(options?: {
+    apiKey?: string;
+    baseUrl?: string;
+    defaultModel?: string;
+  }) {
+    this.apiKey = options?.apiKey || import.meta.env.OPENROUTER_API_KEY;
     
     if (!this.apiKey) {
       throw new Error("OpenRouter API key is required");
+    }
+    
+    if (options?.baseUrl) {
+      this.baseUrl = options.baseUrl;
+    }
+    
+    if (options?.defaultModel) {
+      this.defaultModel = options.defaultModel;
     }
   }
   
@@ -32,33 +46,66 @@ class OpenRouterService {
 }
 ```
 
-Konstruktor przyjmuje opcjonalny parametr `apiKey`. Jeśli klucz nie zostanie przekazany, usługa spróbuje pobrać go ze zmiennej środowiskowej `OPENROUTER_API_KEY`. Jeśli klucz API nie jest dostępny, konstruktor zgłosi błąd.
+Konstruktor przyjmuje opcjonalny obiekt konfiguracyjny zawierający następujące parametry:
+- `apiKey`: Klucz API OpenRouter (jeśli nie podano, zostanie użyty klucz ze zmiennej środowiskowej)
+- `baseUrl`: Bazowy URL API (z domyślną wartością "https://openrouter.ai/api/v1")
+- `defaultModel`: Domyślny model do użycia (z domyślną wartością "anthropic/claude-3-opus-20240229")
+
+Konstrukcja serwisu rzuci wyjątek, jeśli klucz API nie zostanie dostarczony ani przez parametr, ani przez zmienną środowiskową.
 
 ## 3. Publiczne metody i pola
 
-### `generateFlashcards`
+### 3.1. `generateFlashcards`
 
-Główna metoda publiczna odpowiedzialna za generowanie fiszek.
+Główna metoda odpowiedzialna za generowanie fiszek na podstawie tekstu źródłowego.
 
 ```typescript
-async generateFlashcards(params: GenerateFlashcardsParams): Promise<GeneratedFlashcardDto[]> {
+async generateFlashcards(params: {
+  sourceText: string;
+  targetLanguage: string;
+  difficultyLevel?: "beginner" | "intermediate" | "advanced";
+  generationType?: "vocabulary" | "phrases" | "definitions";
+  limit?: number;
+  model?: string;
+}): Promise<Array<{
+  frontContent: string;
+  backContent: string;
+  isAiGenerated: boolean;
+}>> {
+  // Walidacja parametrów
+  this.validateParams(params);
+  
+  // Domyślne wartości
+  const limit = params.limit || 10;
+  const model = params.model || this.defaultModel;
+  const difficultyLevel = params.difficultyLevel || "intermediate";
+  const generationType = params.generationType || "vocabulary";
+  
+  // Przygotowanie promptów
+  const { systemMessage, userMessage } = this.preparePrompts(params);
+  
+  // Przygotowanie schematu JSON dla odpowiedzi
+  const responseFormat = this.prepareResponseFormat();
+  
   try {
-    const { source_text, target_language, difficulty_level = "intermediate", generation_type = "vocabulary", limit = 10 } = params;
-    
-    // Walidacja parametrów wejściowych
-    this.validateParams(params);
-    
-    // Przygotowanie promptu dla modelu
-    const prompt = this.preparePrompt(params);
-    
     // Wywołanie API OpenRouter
-    const response = await this.callOpenRouterApi(prompt, limit);
+    const response = await this.callApi({
+      model,
+      systemMessage,
+      userMessage,
+      responseFormat,
+      maxTokens: Math.min(4000, limit * 400), // Zależne od liczby fiszek
+    });
     
-    // Parsowanie odpowiedzi
+    // Parsowanie i walidacja odpowiedzi
     const flashcards = this.parseResponse(response);
     
-    // Walidacja wygenerowanych fiszek
-    return this.validateGeneratedFlashcards(flashcards);
+    // Zwrócenie wygenerowanych fiszek
+    return flashcards.slice(0, limit).map(card => ({
+      frontContent: card.front,
+      backContent: card.back,
+      isAiGenerated: true
+    }));
   } catch (error) {
     this.handleError(error);
     throw error;
@@ -66,368 +113,537 @@ async generateFlashcards(params: GenerateFlashcardsParams): Promise<GeneratedFla
 }
 ```
 
-### Typy danych
+### 3.2. `getAvailableModels`
+
+Metoda do pobierania listy dostępnych modeli z OpenRouter.
 
 ```typescript
-interface GenerateFlashcardsParams {
-  source_text: string;
-  target_language: string;
-  difficulty_level?: "beginner" | "intermediate" | "advanced";
-  generation_type?: "vocabulary" | "phrases" | "definitions";
-  limit?: number;
-}
-
-interface GeneratedFlashcardDto {
-  front_content: string;
-  back_content: string;
-  is_ai_generated: boolean;
+async getAvailableModels(): Promise<Array<{
+  id: string;
+  name: string;
+  contextLength: number;
+  pricing: {
+    prompt: number;
+    completion: number;
+  };
+}>> {
+  try {
+    const response = await fetch(`${this.baseUrl}/models`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+    
+    if (!response.ok) {
+      throw new OpenRouterError(
+        `Failed to fetch models: ${response.statusText}`,
+        response.status
+      );
+    }
+    
+    const data = await response.json();
+    
+    return data.data.map(model => ({
+      id: model.id,
+      name: model.name,
+      contextLength: model.context_length,
+      pricing: {
+        prompt: model.pricing.prompt,
+        completion: model.pricing.completion
+      }
+    }));
+  } catch (error) {
+    this.handleError(error);
+    throw error;
+  }
 }
 ```
 
 ## 4. Prywatne metody i pola
 
-### `validateParams`
+### 4.1. `validateParams`
 
 ```typescript
-private validateParams(params: GenerateFlashcardsParams): void {
-  const { source_text, target_language, limit } = params;
-  
-  if (!source_text || source_text.trim().length === 0) {
-    throw new Error("Source text is required");
+private validateParams(params: {
+  sourceText: string;
+  targetLanguage: string;
+  difficultyLevel?: string;
+  generationType?: string;
+  limit?: number;
+}): void {
+  if (!params.sourceText || params.sourceText.trim() === "") {
+    throw new OpenRouterError("Source text is required", 400);
   }
   
-  if (source_text.length > 10000) {
-    throw new Error("Source text is too long (max 10,000 characters)");
+  if (params.sourceText.length > 15000) {
+    throw new OpenRouterError("Source text is too long (max 15,000 characters)", 400);
   }
   
-  if (!target_language || target_language.trim().length === 0) {
-    throw new Error("Target language is required");
+  if (!params.targetLanguage || params.targetLanguage.trim() === "") {
+    throw new OpenRouterError("Target language is required", 400);
   }
   
-  if (limit && (limit < 1 || limit > 20)) {
-    throw new Error("Limit must be between 1 and 20");
+  if (params.limit !== undefined) {
+    if (params.limit < 1) {
+      throw new OpenRouterError("Limit must be at least 1", 400);
+    }
+    
+    if (params.limit > 30) {
+      throw new OpenRouterError("Limit cannot exceed 30 flashcards", 400);
+    }
   }
 }
 ```
 
-### `preparePrompt`
+### 4.2. `preparePrompts`
 
 ```typescript
-private preparePrompt(params: GenerateFlashcardsParams): string {
-  const { source_text, target_language, difficulty_level, generation_type, limit } = params;
+private preparePrompts(params: {
+  sourceText: string;
+  targetLanguage: string;
+  difficultyLevel?: string;
+  generationType?: string;
+  limit?: number;
+}): { systemMessage: string; userMessage: string } {
+  const {
+    sourceText,
+    targetLanguage,
+    difficultyLevel = "intermediate",
+    generationType = "vocabulary",
+    limit = 10
+  } = params;
   
-  const systemMessage = `
-    Jesteś ekspertem w tworzeniu fiszek edukacyjnych. 
-    Twoim zadaniem jest wygenerowanie fiszek na podstawie podanego tekstu.
-    Generuj fiszki na poziomie trudności: ${difficulty_level}.
-    Typ fiszek: ${generation_type}.
-    Język docelowy: ${target_language}.
-    Utwórz maksymalnie ${limit} fiszek.
-  `;
+  const systemMessage = `Jesteś ekspertem w tworzeniu fiszek edukacyjnych dla osób uczących się języków obcych. 
+Tworzysz wysokiej jakości, precyzyjne fiszki na podstawie dostarczonych tekstów.
+Poziom trudności: ${difficultyLevel}.
+Typ fiszek: ${generationType}.
+Język docelowy: ${targetLanguage}.
+Wygeneruj dokładnie ${limit} fiszek w odpowiedzi JSON.
+Każda fiszka powinna mieć pole "front" (przód) i "back" (tył).
+- Dla słownictwa (vocabulary): na przodzie umieść słowo w języku oryginalnym, na tyle tłumaczenie.
+- Dla zwrotów (phrases): na przodzie umieść zwrot w języku oryginalnym, na tyle tłumaczenie.
+- Dla definicji (definitions): na przodzie umieść słowo lub pojęcie, na tyle definicję.
+Upewnij się, że przód i tył fiszki są związane z kontekstem tekstu źródłowego.`;
   
-  const userMessage = `
-    Proszę wygenerować fiszki na podstawie tego tekstu:
-    ${source_text}
-  `;
+  const userMessage = `Proszę o stworzenie ${limit} fiszek na podstawie poniższego tekstu:
+
+${sourceText}`;
   
+  return { systemMessage, userMessage };
+}
+```
+
+### 4.3. `prepareResponseFormat`
+
+```typescript
+private prepareResponseFormat() {
   return {
-    system: systemMessage,
-    user: userMessage
+    type: "json_object",
+    schema: {
+      type: "object",
+      properties: {
+        flashcards: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              front: {
+                type: "string",
+                description: "Front side of the flashcard (question/word/term)"
+              },
+              back: {
+                type: "string",
+                description: "Back side of the flashcard (answer/translation/definition)"
+              }
+            },
+            required: ["front", "back"]
+          }
+        }
+      },
+      required: ["flashcards"]
+    }
   };
 }
 ```
 
-### `callOpenRouterApi`
+### 4.4. `callApi`
 
 ```typescript
-private async callOpenRouterApi(prompt: { system: string; user: string }, limit: number): Promise<any> {
-  const requestBody = {
-    model: "anthropic/claude-3-opus-20240229",
+private async callApi(options: {
+  model: string;
+  systemMessage: string;
+  userMessage: string;
+  responseFormat: any;
+  maxTokens?: number;
+  temperature?: number;
+}): Promise<any> {
+  const {
+    model,
+    systemMessage,
+    userMessage,
+    responseFormat,
+    maxTokens = 4000,
+    temperature = 0.7
+  } = options;
+  
+  const payload = {
+    model,
     messages: [
-      {
-        role: "system",
-        content: prompt.system
-      },
-      {
-        role: "user",
-        content: prompt.user
-      }
+      { role: "system", content: systemMessage },
+      { role: "user", content: userMessage }
     ],
-    response_format: {
-      type: "json_object",
-      schema: {
-        type: "object",
-        properties: {
-          flashcards: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                front_content: { type: "string" },
-                back_content: { type: "string" }
-              },
-              required: ["front_content", "back_content"]
-            }
-          }
-        },
-        required: ["flashcards"]
-      }
-    },
-    temperature: 0.7,
-    max_tokens: 4000
+    response_format: responseFormat,
+    max_tokens: maxTokens,
+    temperature,
   };
-
+  
   const response = await fetch(`${this.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${this.apiKey}`,
-      "HTTP-Referer": "https://10xcards.app", // Adres strony, z której pochodzi zapytanie
-      "X-Title": "10xCards" // Nazwa aplikacji
+      "HTTP-Referer": "https://10xcards.app",
+      "X-Title": "10xCards"
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(payload)
   });
-
+  
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new OpenRouterError(`API call failed with status ${response.status}`, response.status, errorData);
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { message: response.statusText };
+    }
+    
+    throw new OpenRouterError(
+      `API request failed: ${errorData.message || response.statusText}`,
+      response.status,
+      errorData
+    );
   }
-
+  
   return await response.json();
 }
 ```
 
-### `parseResponse`
+### 4.5. `parseResponse`
 
 ```typescript
-private parseResponse(response: any): GeneratedFlashcardDto[] {
+private parseResponse(response: any): Array<{ front: string; back: string }> {
   try {
-    // Sprawdzenie czy odpowiedź zawiera oczekiwane pola
-    if (!response.choices || !response.choices[0] || !response.choices[0].message || !response.choices[0].message.content) {
+    if (!response.choices || 
+        !response.choices[0] || 
+        !response.choices[0].message || 
+        !response.choices[0].message.content) {
       throw new Error("Invalid API response format");
     }
-
-    // Parsowanie treści odpowiedzi jako JSON
+    
     const content = JSON.parse(response.choices[0].message.content);
     
     if (!content.flashcards || !Array.isArray(content.flashcards)) {
       throw new Error("Invalid flashcards format in response");
     }
-
-    // Mapowanie odpowiedzi na format DTO
-    return content.flashcards.map(card => ({
-      front_content: card.front_content,
-      back_content: card.back_content,
-      is_ai_generated: true
-    }));
+    
+    // Walidacja każdej fiszki
+    return content.flashcards.filter(card => {
+      // Sprawdzenie czy karta ma wymagane pola
+      if (!card.front || !card.back) {
+        return false;
+      }
+      
+      // Sprawdzenie czy pola nie są puste
+      if (card.front.trim() === "" || card.back.trim() === "") {
+        return false;
+      }
+      
+      // Sprawdzenie długości pól
+      if (card.front.length > 500 || card.back.length > 1000) {
+        card.front = card.front.substring(0, 500);
+        card.back = card.back.substring(0, 1000);
+      }
+      
+      return true;
+    });
   } catch (error) {
-    console.error("Error parsing OpenRouter response:", error);
-    throw new Error("Failed to parse model response");
+    console.error("Error parsing API response:", error);
+    throw new OpenRouterError(
+      "Failed to parse API response",
+      500,
+      { originalError: error }
+    );
   }
 }
 ```
 
-### `validateGeneratedFlashcards`
-
-```typescript
-private validateGeneratedFlashcards(flashcards: GeneratedFlashcardDto[]): GeneratedFlashcardDto[] {
-  return flashcards.filter(card => {
-    // Sprawdzenie czy pola nie są puste
-    if (!card.front_content || !card.back_content) {
-      return false;
-    }
-    
-    // Sprawdzenie maksymalnej długości zawartości
-    if (card.front_content.length > 500 || card.back_content.length > 200) {
-      // Przycinamy zawartość, jeśli jest za długa
-      card.front_content = card.front_content.substring(0, 500);
-      card.back_content = card.back_content.substring(0, 200);
-    }
-    
-    return true;
-  });
-}
-```
-
-### `handleError`
+### 4.6. `handleError`
 
 ```typescript
 private handleError(error: any): void {
-  // Logowanie błędu
-  console.error("OpenRouter service error:", error);
+  // Logowanie błędu do konsoli
+  console.error("[OpenRouterService] Error:", error);
   
-  // Konwersja różnych typów błędów na standardowy format
+  // Jeśli błąd jest już typu OpenRouterError, po prostu go propaguj
   if (error instanceof OpenRouterError) {
-    // Błąd został już sformatowany
     throw error;
-  } else if (error instanceof Error) {
-    throw new OpenRouterError(error.message, 500);
-  } else {
-    throw new OpenRouterError("Unknown error occurred", 500);
   }
+  
+  // W przeciwnym razie, opakuj błąd w OpenRouterError
+  if (error instanceof Error) {
+    throw new OpenRouterError(
+      error.message,
+      500,
+      { originalError: error }
+    );
+  }
+  
+  // Dla innych typów błędów
+  throw new OpenRouterError(
+    "Unknown error occurred",
+    500,
+    { originalError: error }
+  );
 }
 ```
 
 ## 5. Obsługa błędów
 
-Zdefiniujemy własną klasę błędu, która będzie zawierać szczegółowe informacje o problemach z API:
+### 5.1. Klasa błędu OpenRouter
 
 ```typescript
-class OpenRouterError extends Error {
+export class OpenRouterError extends Error {
   status: number;
-  data?: any;
+  details: any;
   
-  constructor(message: string, status: number = 500, data?: any) {
+  constructor(message: string, status: number = 500, details?: any) {
     super(message);
     this.name = "OpenRouterError";
     this.status = status;
-    this.data = data;
+    this.details = details;
+    
+    // Zachowanie stack trace
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, OpenRouterError);
+    }
   }
 }
 ```
 
-Kody błędów i ich obsługa:
-- 400: Nieprawidłowe żądanie (błędne parametry)
-- 401: Nieautoryzowany dostęp (nieprawidłowy klucz API)
-- 402: Przekroczony limit kredytów
-- 429: Zbyt wiele żądań
-- 500: Błąd serwera
+### 5.2. Kody błędów
 
-Strategia obsługi błędów:
-1. Logowanie wszystkich błędów
-2. Ponowna próba dla błędów HTTP 429 i 500 (z backoff)
-3. Informowanie użytkownika o problemach w zrozumiały sposób
-4. Monitorowanie wskaźników błędów w celu identyfikacji problemów
+| Kod statusu | Opis | Przyczyna | Rozwiązanie |
+|-------------|------|-----------|-------------|
+| 400 | Bad Request | Nieprawidłowe parametry żądania | Sprawdź poprawność parametrów |
+| 401 | Unauthorized | Nieprawidłowy klucz API | Sprawdź klucz API |
+| 402 | Payment Required | Brak środków na koncie | Doładuj konto OpenRouter |
+| 403 | Forbidden | Brak uprawnień do zasobu | Sprawdź uprawnienia konta |
+| 404 | Not Found | Zasób nie istnieje | Sprawdź URL i nazwę modelu |
+| 429 | Too Many Requests | Przekroczono limit zapytań | Implementuj mechanizm ponownych prób z exponential backoff |
+| 500 | Internal Server Error | Błąd serwera OpenRouter | Zaimplementuj ponowne próby dla błędów serwera |
+
+### 5.3. Strategia obsługi błędów
+
+1. **Walidacja parametrów wejściowych** przed wywołaniem API, aby uniknąć błędów 400
+2. **Exponential backoff** dla błędów 429 i 500
+3. **Przechowywanie logów błędów** w celu analizy i debugowania
+4. **Przyjazne dla użytkownika komunikaty błędów** w interfejsie użytkownika
+5. **Monitorowanie wskaźników błędów** w celu wykrycia problemów z usługą
 
 ## 6. Kwestie bezpieczeństwa
 
-1. **Ochrona klucza API:**
-   - Klucz API przechowywany w zmiennych środowiskowych
-   - Nigdy nie ekspozuj klucza w kodzie front-end
-   - Używanie polityki CORS dla endpointów API
+### 6.1. Bezpieczeństwo kluczy API
 
-2. **Walidacja wejść:**
-   - Sprawdzanie długości i formatu tekstu źródłowego
-   - Filtrowanie niebezpiecznych znaków
-   - Implementacja limitów dla zapytań
+1. **Przechowywanie kluczy API**:
+   - Używaj zmiennych środowiskowych do przechowywania kluczy API
+   - Nie umieszczaj kluczy API w kodzie źródłowym lub w repozytoriach
+   - Używaj różnych kluczy API dla środowisk deweloperskich i produkcyjnych
 
-3. **Ochrona przed nadużyciami:**
-   - Implementacja rate limitingu na poziomie API
-   - Monitorowanie użycia pod kątem anomalii
-   - Ustawienie limitów na ilość generowanych fiszek na użytkownika
+2. **Ochrona endpointów API**:
+   - Wszystkie endpointy API powinny być zabezpieczone autentykacją użytkownika
+   - Implementuj ograniczenia na liczbę zapytań na użytkownika (rate limiting)
 
-4. **Ochrona danych użytkowników:**
-   - Nie przesyłaj danych identyfikujących użytkownika do OpenRouter
-   - Zaimplementuj politykę prywatności dla generowanych danych
-   - Daj użytkownikowi opcję usunięcia wszystkich wygenerowanych danych
+### 6.2. Bezpieczeństwo danych
+
+1. **Ochrona danych użytkownika**:
+   - Nie przesyłaj danych osobowych użytkowników do OpenRouter
+   - Filtruj wrażliwe informacje z tekstów źródłowych
+   - Implementuj politykę prywatności zgodną z RODO/GDPR
+
+2. **Walidacja wejść i wyjść**:
+   - Zawsze waliduj dane wejściowe przed wysłaniem do API
+   - Sprawdzaj integralność danych wyjściowych przed zapisaniem w bazie danych
+   - Używaj sanityzacji danych, aby zapobiec atakom XSS i injection
+
+### 6.3. Monitorowanie i audyt
+
+1. **Monitorowanie użycia**:
+   - Śledź liczbę zapytań do API per użytkownik
+   - Monitoruj koszty używania API
+   - Ustawiaj alerty przy nietypowych wzorcach użycia
+
+2. **Audyt bezpieczeństwa**:
+   - Regularnie przeprowadzaj audyty bezpieczeństwa kodu i API
+   - Implementuj dzienniki audytu dla ważnych operacji
+   - Sprawdzaj najnowsze zalecenia bezpieczeństwa dla API zewnętrznych
 
 ## 7. Plan wdrożenia krok po kroku
 
-### Krok 1: Konfiguracja zmiennych środowiskowych
+### Etap 1: Konfiguracja środowiska
 
-1. Dodaj zmienną `OPENROUTER_API_KEY` do pliku `.env.local`:
-   ```
-   OPENROUTER_API_KEY=your_openrouter_api_key_here
+1. **Dodaj zmienne środowiskowe**:
+   ```bash
+   # W pliku .env.local
+   OPENROUTER_API_KEY=your_api_key_here
    ```
 
-2. Zaktualizuj plik `src/env.d.ts`, aby uwzględnić nową zmienną środowiskową:
+2. **Dodaj typy dla zmiennych środowiskowych**:
    ```typescript
+   // src/env.d.ts
    interface ImportMetaEnv {
+     // Istniejące zmienne
      readonly SUPABASE_URL: string;
      readonly SUPABASE_KEY: string;
+     
+     // Nowa zmienna
      readonly OPENROUTER_API_KEY: string;
-     // inne zmienne...
    }
    ```
 
-### Krok 2: Implementacja usługi OpenRouter
+### Etap 2: Implementacja klasy serwisu
 
-1. Utwórz plik `src/lib/services/openrouter.service.ts` z implementacją klasy:
+1. **Utwórz plik klasy błędu**:
    ```typescript
-   import type { GenerateFlashcardsInput } from "../validation/schemas";
-   import type { GeneratedFlashcardDto } from "../../types";
+   // src/lib/errors/openrouter-error.ts
+   export class OpenRouterError extends Error {
+     // Implementacja z sekcji 5.1
+   }
+   ```
+
+2. **Utwórz plik serwisu OpenRouter**:
+   ```typescript
+   // src/lib/services/openrouter.service.ts
+   import { OpenRouterError } from "../errors/openrouter-error";
    
-   // Implementacja klasy OpenRouterService
    export class OpenRouterService {
-     // ... implementacja z powyższych sekcji
+     // Implementacja z sekcji 2, 3 i 4
    }
    
    // Eksport instancji singletona
    export const openRouterService = new OpenRouterService();
    ```
 
-### Krok 3: Implementacja endpointu API do generowania fiszek
+### Etap 3: Implementacja schematów walidacji
 
-1. Utwórz plik `src/pages/api/flashcards/generate.ts`:
+1. **Stwórz schematy walidacji za pomocą Zod**:
    ```typescript
+   // src/lib/validation/flashcard-schemas.ts
+   import { z } from "zod";
+   
+   export const generateFlashcardsSchema = z.object({
+     source_text: z.string().min(1, "Tekst źródłowy jest wymagany").max(15000, "Tekst źródłowy jest zbyt długi"),
+     target_language: z.string().min(1, "Język docelowy jest wymagany"),
+     difficulty_level: z.enum(["beginner", "intermediate", "advanced"]).optional().default("intermediate"),
+     generation_type: z.enum(["vocabulary", "phrases", "definitions"]).optional().default("vocabulary"),
+     limit: z.number().int().min(1).max(30).optional().default(10),
+     model: z.string().optional()
+   });
+   
+   export type GenerateFlashcardsInput = z.infer<typeof generateFlashcardsSchema>;
+   ```
+
+### Etap 4: Implementacja endpointu API
+
+1. **Utwórz endpoint API do generowania fiszek**:
+   ```typescript
+   // src/pages/api/flashcards/generate.ts
    import type { APIContext } from "astro";
    import { openRouterService } from "../../../lib/services/openrouter.service";
-   import { generateFlashcardsSchema } from "../../../lib/validation/schemas";
-   import type { GenerateFlashcardsInput } from "../../../lib/validation/schemas";
+   import { generateFlashcardsSchema } from "../../../lib/validation/flashcard-schemas";
+   import { OpenRouterError } from "../../../lib/errors/openrouter-error";
    
    export const prerender = false;
    
-   export async function POST(context: APIContext): Promise<Response> {
+   export async function POST(context: APIContext) {
      try {
        // Sprawdź czy użytkownik jest zalogowany
        const { data: sessionData } = await context.locals.supabase.auth.getSession();
        if (!sessionData.session) {
          return new Response(
-           JSON.stringify({ error: "Unauthorized access. Please login to continue." }),
+           JSON.stringify({ error: "Unauthorized access" }),
            { status: 401, headers: { "Content-Type": "application/json" } }
          );
        }
-   
-       // Pobierz dane z żądania
-       const data = await context.request.json();
        
-       // Walidacja danych wejściowych
-       const validationResult = generateFlashcardsSchema.safeParse(data);
+       // Pobierz i zwaliduj dane wejściowe
+       const body = await context.request.json();
+       const validationResult = generateFlashcardsSchema.safeParse(body);
+       
        if (!validationResult.success) {
          return new Response(
-           JSON.stringify({ error: "Invalid input data", details: validationResult.error.errors }),
+           JSON.stringify({ 
+             error: "Invalid input data", 
+             details: validationResult.error.format() 
+           }),
            { status: 400, headers: { "Content-Type": "application/json" } }
          );
        }
        
-       // Generowanie fiszek
-       const flashcardsInput: GenerateFlashcardsInput = validationResult.data;
-       const generatedFlashcards = await openRouterService.generateFlashcards(flashcardsInput);
+       // Konwersja nazw parametrów z snake_case na camelCase
+       const params = {
+         sourceText: validationResult.data.source_text,
+         targetLanguage: validationResult.data.target_language,
+         difficultyLevel: validationResult.data.difficulty_level,
+         generationType: validationResult.data.generation_type,
+         limit: validationResult.data.limit,
+         model: validationResult.data.model
+       };
        
-       // Zwróć wygenerowane fiszki
+       // Wygeneruj fiszki
+       const flashcards = await openRouterService.generateFlashcards(params);
+       
+       // Zwróć odpowiedź
        return new Response(
-         JSON.stringify({ flashcards: generatedFlashcards }),
+         JSON.stringify({ flashcards }),
          { status: 200, headers: { "Content-Type": "application/json" } }
        );
-     } catch (error: any) {
+     } catch (error) {
        console.error("Error generating flashcards:", error);
        
-       // Określ kod statusu na podstawie błędu
-       const status = error.status || 500;
-       const message = error.message || "An error occurred while generating flashcards";
+       // Handle OpenRouterError
+       if (error instanceof OpenRouterError) {
+         return new Response(
+           JSON.stringify({ 
+             error: error.message,
+             details: error.details 
+           }),
+           { status: error.status, headers: { "Content-Type": "application/json" } }
+         );
+       }
        
+       // Handle other errors
        return new Response(
-         JSON.stringify({ error: message }),
-         { status, headers: { "Content-Type": "application/json" } }
+         JSON.stringify({ error: "Internal server error" }),
+         { status: 500, headers: { "Content-Type": "application/json" } }
        );
      }
    }
    ```
 
-### Krok 4: Implementacja komponentu interfejsu użytkownika
+### Etap 5: Implementacja interfejsu użytkownika
 
-1. Utwórz plik `src/components/flashcards/GenerateFromTextForm.tsx`:
+1. **Utwórz komponent formularza generowania fiszek**:
    ```tsx
+   // src/components/flashcards/GenerateFromTextForm.tsx
    import { useState } from "react";
    import { Button } from "@/components/ui/Button";
-   import { Card } from "@/components/ui/Card";
-   import { Input } from "@/components/ui/Input";
    import { Label } from "@/components/ui/Label";
    import { Textarea } from "@/components/ui/Textarea";
+   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
+   import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
    import { useToast } from "@/components/ui/use-toast";
-   import { Check, Loader2 } from "lucide-react";
-   import type { GeneratedFlashcardDto } from "../../types";
-   import axios from "axios";
+   import { Loader2 } from "lucide-react";
    
    export default function GenerateFromTextForm() {
      const [sourceText, setSourceText] = useState("");
@@ -436,13 +652,13 @@ Strategia obsługi błędów:
      const [generationType, setGenerationType] = useState("vocabulary");
      const [limit, setLimit] = useState(10);
      const [isGenerating, setIsGenerating] = useState(false);
-     const [generatedFlashcards, setGeneratedFlashcards] = useState<GeneratedFlashcardDto[]>([]);
-     const [selectedFlashcards, setSelectedFlashcards] = useState<Record<string, boolean>>({});
-     const [isSaving, setIsSaving] = useState(false);
+     const [generatedFlashcards, setGeneratedFlashcards] = useState([]);
      
      const { toast } = useToast();
      
-     const handleGenerate = async () => {
+     const handleSubmit = async (e) => {
+       e.preventDefault();
+       
        if (!sourceText.trim()) {
          toast({
            title: "Błąd",
@@ -455,34 +671,38 @@ Strategia obsługi błędów:
        setIsGenerating(true);
        
        try {
-         const response = await axios.post("/api/flashcards/generate", {
-           source_text: sourceText,
-           target_language: targetLanguage,
-           difficulty_level: difficultyLevel,
-           generation_type: generationType,
-           limit,
+         const response = await fetch("/api/flashcards/generate", {
+           method: "POST",
+           headers: {
+             "Content-Type": "application/json",
+           },
+           body: JSON.stringify({
+             source_text: sourceText,
+             target_language: targetLanguage,
+             difficulty_level: difficultyLevel,
+             generation_type: generationType,
+             limit: Number(limit),
+           }),
          });
          
-         setGeneratedFlashcards(response.data.flashcards);
+         const data = await response.json();
          
-         // Inicjalizacja stanu zaznaczenia (wszystkie domyślnie zaznaczone)
-         const initialSelection = response.data.flashcards.reduce((acc, card, index) => {
-           acc[index] = true;
-           return acc;
-         }, {});
+         if (!response.ok) {
+           throw new Error(data.error || "Failed to generate flashcards");
+         }
          
-         setSelectedFlashcards(initialSelection);
+         setGeneratedFlashcards(data.flashcards);
          
          toast({
            title: "Sukces",
-           description: `Wygenerowano ${response.data.flashcards.length} fiszek.`,
+           description: `Wygenerowano ${data.flashcards.length} fiszek.`,
          });
-       } catch (error: any) {
+       } catch (error) {
          console.error("Error generating flashcards:", error);
          
          toast({
            title: "Błąd generowania",
-           description: error.response?.data?.error || "Wystąpił problem podczas generowania fiszek.",
+           description: error.message || "Wystąpił problem podczas generowania fiszek.",
            variant: "destructive",
          });
        } finally {
@@ -490,55 +710,13 @@ Strategia obsługi błędów:
        }
      };
      
-     const handleSaveSelected = async () => {
-       const flashcardsToSave = generatedFlashcards.filter((_, index) => selectedFlashcards[index]);
-       
-       if (flashcardsToSave.length === 0) {
-         toast({
-           title: "Informacja",
-           description: "Nie wybrano żadnych fiszek do zapisania.",
-         });
-         return;
-       }
-       
-       setIsSaving(true);
-       
-       try {
-         const response = await axios.post("/api/flashcards/accept", {
-           flashcards: flashcardsToSave,
-         });
-         
-         toast({
-           title: "Sukces",
-           description: `Zapisano ${response.data.accepted_count} fiszek.`,
-         });
-         
-         // Czyszczenie formularza
-         setGeneratedFlashcards([]);
-         setSelectedFlashcards({});
-         setSourceText("");
-       } catch (error: any) {
-         console.error("Error saving flashcards:", error);
-         
-         toast({
-           title: "Błąd zapisywania",
-           description: error.response?.data?.error || "Wystąpił problem podczas zapisywania fiszek.",
-           variant: "destructive",
-         });
-       } finally {
-         setIsSaving(false);
-       }
-     };
-     
-     // Reszta komponentu z renderowaniem formularza i wygenerowanych fiszek
-     // ...
+     // Renderowanie komponentu...
    }
    ```
 
-### Krok 5: Integracja z istniejącym kodem
-
-1. Zaktualizuj plik `src/pages/flashcards/create.astro`, aby dodać nową zakładkę/opcję generowania z tekstu:
+2. **Zintegruj komponent z istniejącą stroną**:
    ```astro
+   <!-- src/pages/flashcards/create.astro -->
    ---
    import Layout from "../../layouts/MainLayout.astro";
    import CreateFlashcardForm from "../../components/flashcards/CreateFlashcardForm";
@@ -552,7 +730,7 @@ Strategia obsługi błędów:
      return Astro.redirect("/auth/login?redirect=/flashcards/create");
    }
    ---
-
+   
    <Layout title="Stwórz fiszkę | 10xCards">
      <div class="container mx-auto p-4">
        <h1 class="text-2xl font-bold mb-4">Tworzenie fiszek</h1>
@@ -575,36 +753,30 @@ Strategia obsługi błędów:
    </Layout>
    ```
 
-### Krok 6: Testowanie
+### Etap 6: Testowanie i debugowanie
 
-1. Testowanie jednostkowe:
-   - Testy walidacji parametrów
-   - Testy parsowania odpowiedzi
-   - Testy obsługi błędów
+1. **Utwórz testy jednostkowe dla serwisu**:
+   ```typescript
+   // tests/openrouter.service.test.ts
+   import { describe, it, expect, vi, beforeEach } from 'vitest';
+   import { OpenRouterService } from '../src/lib/services/openrouter.service';
+   
+   // Testy jednostkowe...
+   ```
 
-2. Testowanie integracyjne:
-   - Testy endpointu API
-   - Testy z mockami odpowiedzi OpenRouter
+2. **Testowanie manualne**:
+   - Przetestuj generowanie fiszek z różnymi parametrami
+   - Sprawdź obsługę błędów poprzez symulowanie różnych warunków błędu
+   - Zweryfikuj, czy logi błędów są odpowiednio rejestrowane
 
-3. Testowanie end-to-end:
-   - Testy generowania fiszek z różnymi parametrami
-   - Testy zapisywania wygenerowanych fiszek
+### Etap 7: Dokumentacja i wdrożenie
 
-### Krok 7: Rozbudowa i monitorowanie
+1. **Zaktualizuj dokumentację API**:
+   - Dodaj dokumentację endpointu `/api/flashcards/generate`
+   - Opisz wymagane parametry i format odpowiedzi
+   - Udokumentuj obsługę błędów
 
-1. Dodanie metryk i logowania:
-   - Czas odpowiedzi API
-   - Liczba wygenerowanych fiszek
-   - Wskaźniki błędów
-
-2. Dodanie funkcji opinie o jakości:
-   - Pozwól użytkownikom oceniać jakość wygenerowanych fiszek
-   - Wykorzystaj opinie do doskonalenia promptów
-
-3. Optymalizacja kosztów:
-   - Monitorowanie kosztów API
-   - Dostosowanie limitów i parametrów dla optymalizacji kosztów
-
-4. Rozszerzenie funkcjonalności:
-   - Dodanie dodatkowych modeli AI
-   - Implementacja nowych typów generowanych fiszek 
+2. **Wdrażanie**:
+   - Uruchom testy przed wdrożeniem
+   - Wdrażaj stopniowo, zaczynając od środowiska deweloperskiego
+   - Monitoruj logi po wdrożeniu, aby wykryć potencjalne problemy 

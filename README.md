@@ -28,6 +28,15 @@ Aplikacja zbudowana jest z modułowych komponentów zgodnych z zasadami Atomic D
 - **Tailwind CSS** - Utility-first framework CSS
 - **Shadcn/ui** - Komponenty UI zbudowane na Radix UI i Tailwind
 - **TanStack Query** - Biblioteka do zarządzania stanem i zapytaniami
+- **Supabase** - Backend-as-a-Service z bazą PostgreSQL i autentykacją
+- **OpenRouter** - Bramka dostępu do modeli AI
+
+### Narzędzia testowe
+
+- **Vitest** - Szybki framework testów jednostkowych i integracyjnych
+- **React Testing Library** - Biblioteka do testowania komponentów React
+- **Playwright** - Framework do testów end-to-end
+- **MSW** - Narzędzie do mockowania API w testach
 
 ## Uruchomienie aplikacji
 
@@ -45,6 +54,22 @@ npm run build
 npm run preview
 ```
 
+## Uruchomienie testów
+
+```bash
+# Uruchomienie testów jednostkowych i integracyjnych
+npm run test
+
+# Uruchomienie testów z podglądem na żywo
+npm run test:watch
+
+# Uruchomienie testów end-to-end
+npm run test:e2e
+
+# Uruchomienie testów end-to-end z UI
+npm run test:e2e:ui
+```
+
 ## Struktura projektu
 
 ```
@@ -58,6 +83,9 @@ src/
 ├── lib/            # Biblioteki i utilities
 ├── pages/          # Strony Astro
 └── types/          # Typy TypeScript
+tests/
+├── unit/           # Testy jednostkowe i integracyjne
+└── e2e/            # Testy end-to-end
 ```
 
 ## Project Description
@@ -112,6 +140,11 @@ The application is designed for anyone who wants to create and learn from flashc
 - `npm run lint` - Run ESLint to check for code issues
 - `npm run lint:fix` - Fix linting issues automatically
 - `npm run format` - Format code using Prettier
+- `npm run test` - Run all unit and integration tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run test:e2e` - Run end-to-end tests headlessly
+- `npm run test:e2e:ui` - Run end-to-end tests with UI
 
 ## Project Scope
 
@@ -121,6 +154,7 @@ The application is designed for anyone who wants to create and learn from flashc
 - Manual creation and management of flashcards
 - Learning with integrated spaced repetition algorithm
 - Simple and intuitive user interface
+- Comprehensive test suite (unit, integration, and end-to-end tests)
 
 ### What's Not Included in MVP
 - Advanced spaced repetition algorithm (like SuperMemo, Anki)
@@ -147,6 +181,7 @@ Key metrics for success:
 - 75% of flashcards created using AI rather than manually
 - 50% reduction in time needed to create 10 flashcards compared to manual creation
 - Average learning session of at least 5 minutes
+- 80% test coverage for core functionality
 
 ## Inicjalizacja bazy danych
 

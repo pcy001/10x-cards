@@ -236,3 +236,57 @@ Użytkownicy stoją przed następującymi wyzwaniami:
 - Interfejs użytkownika jest oceniany jako intuicyjny i przyjazny
 - Użytkownicy regularnie wracają do aplikacji, aby kontynuować naukę
 - Użytkownicy polecają aplikację innym osobom 
+
+## 7. Wymagania bezpieczeństwa i autentykacji
+
+### 7.1 Bezpieczeństwo danych
+
+#### 7.1.1 Ochrona danych użytkownika
+- Wszystkie dane użytkownika są przechowywane w bezpiecznej bazie danych Supabase
+- Dane osobowe są ograniczone do minimum (email i bezpiecznie hashowane hasło)
+- Dane użytkownika są izolowane z wykorzystaniem Row Level Security (RLS) w PostgreSQL
+- Wszystkie fiszki i dane nauki są powiązane z kontem użytkownika i niedostępne dla innych użytkowników
+
+#### 7.1.2 Transmisja danych
+- Komunikacja z serwerem odbywa się wyłącznie przez protokół HTTPS
+- Tokeny JWT są bezpiecznie przechowywane w ciasteczkach z flagami HttpOnly, Secure i SameSite
+- Wygasanie tokenów sesji jest odpowiednio skonfigurowane dla zachowania równowagi między bezpieczeństwem a wygodą użytkowania
+
+### 7.2 System autentykacji
+
+#### 7.2.1 Obsługiwane metody autentykacji
+- Logowanie za pomocą adresu email i hasła
+- Możliwość resetowania hasła poprzez link wysyłany na adres email
+- Weryfikacja adresu email przy rejestracji
+- Obsługa przekierowań po logowaniu do żądanej strony (parametr redirect)
+
+#### 7.2.2 Middleware autentykacji
+- Automatyczna weryfikacja sesji użytkownika dla wszystkich chronionych tras
+- Przekierowanie niezalogowanych użytkowników do strony logowania
+- Obsługa wygasania sesji z automatycznym odświeżaniem tokenu uwierzytelniającego
+- Przechowywanie informacji o aktualnie zalogowanym użytkowniku w kontekście Astro
+
+#### 7.2.3 Izolacja danych i autoryzacja
+- Każdy endpoint API weryfikuje autentykację użytkownika
+- Implementacja polityk RLS na poziomie bazy danych zapewniająca, że użytkownicy mają dostęp tylko do swoich danych
+- Automatyczne filtrowanie danych na podstawie ID użytkownika dla wszystkich zapytań
+- Odpowiednie zabezpieczenia przed atakami CSRF
+
+### 7.3 Klucze API i bezpieczeństwo zewnętrznych integracji
+
+#### 7.3.1 OpenRouter API
+- Klucze API dla OpenRouter są przechowywane w zmiennych środowiskowych, niedostępnych dla klienta
+- Wszystkie zapytania do zewnętrznych API są wykonywane przez serwer, nigdy bezpośrednio z przeglądarki
+- Implementacja limitów użycia dla zapobiegania nadużyciom
+- Monitorowanie użycia API dla wykrywania nieautoryzowanych dostępów
+
+#### 7.3.2 Supabase
+- Klucze dostępu do Supabase są odpowiednio zabezpieczone i przechowywane w zmiennych środowiskowych
+- Wykorzystanie anon key tylko dla operacji dozwolonych przez RLS
+- Service key używany wyłącznie w bezpiecznych kontekstach serwera
+
+### 7.4 Testowanie bezpieczeństwa
+- Regularne audyty bezpieczeństwa kodu źródłowego
+- Testy penetracyjne dla wykrywania potencjalnych luk bezpieczeństwa
+- Monitorowanie logów dostępu i błędów
+- Plan reagowania na incydenty bezpieczeństwa 
