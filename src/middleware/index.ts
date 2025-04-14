@@ -5,9 +5,14 @@ import { supabaseClient } from "../db/supabase.client";
 const PUBLIC_PATHS = [
   "/auth/login",
   "/auth/register",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/reset-redirect",
   "/api/auth/login",
   "/api/auth/register",
   "/api/auth/logout",
+  "/api/auth/reset-password",
+  "/api/auth/update-password",
   "/",
 ];
 
@@ -17,7 +22,7 @@ export const onRequest = defineMiddleware(async ({ request, locals, redirect }, 
 
   // Sprawdź, czy ścieżka jest publiczna
   const url = new URL(request.url);
-  const isPublicPath = PUBLIC_PATHS.some((path) => url.pathname === path || url.pathname.startsWith("/api/auth/"));
+  const isPublicPath = PUBLIC_PATHS.some((path) => url.pathname === path);
 
   // Jeśli to nie jest ścieżka publiczna, sprawdź sesję
   if (!isPublicPath) {

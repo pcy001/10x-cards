@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { 
   saveAcceptedFlashcards, 
   getFlashcards, 
   getFlashcardForReview,
-  createFlashcard
+  createFlashcard,
+  reviewFlashcard
 } from '../../lib/services/flashcard.service';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { FlashcardToAcceptDto } from '../../types';
@@ -51,6 +52,8 @@ const createSupabaseMock = () => {
     order: vi.fn().mockReturnThis(),
     range: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: vi.fn(),
     data: null,
     error: null,
@@ -297,6 +300,179 @@ describe('Flashcard Service', () => {
       await expect(
         createFlashcard(supabaseMock, mockUserId, flashcardData)
       ).rejects.toThrow('Failed to create flashcard');
+    });
+  });
+
+  describe('reviewFlashcard', () => {
+    let supabaseMock: SupabaseClient;
+    let now: Date;
+    
+    beforeEach(() => {
+      supabaseMock = createSupabaseMock();
+      vi.clearAllMocks();
+      
+      // Use fake timers to control dates
+      vi.useFakeTimers();
+      now = new Date('2025-04-14T12:00:00Z');
+      vi.setSystemTime(now);
+      
+      // Setup default mock responses
+      (supabaseMock.from as any).mockReturnThis();
+      (supabaseMock.select as any).mockReturnThis();
+      (supabaseMock.eq as any).mockReturnThis();
+      (supabaseMock.order as any).mockReturnThis();
+      (supabaseMock.limit as any).mockReturnThis();
+      (supabaseMock.update as any).mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          error: null
+        })
+      });
+      (supabaseMock.insert as any).mockReturnValue({
+        error: null,
+      });
+      (supabaseMock.single as any).mockReturnValue({
+        data: { id: mockFlashcardId },
+        error: null,
+      });
+    });
+    
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    
+    it('should successfully review a flashcard with difficulty rating "łatwe"', async () => {
+      // Arrange
+      const reviewData = {
+        difficulty_rating: 'łatwe',
+        is_correct: true,
+      };
+      
+      // Mock existing review check
+      (supabaseMock.limit as any).mockReturnValue({
+        data: [],
+        error: null,
+      });
+      
+      // Mock the Date constructor to advance time when calculating nextReviewDate
+      const realDate = global.Date;
+      const dateSpy = vi.spyOn(global, 'Date');
+      
+      // Allow the current "now" date to be used for the test setup
+      dateSpy.mockImplementation((...args: any[]) => {
+        if (args.length === 0) {
+          // When a new Date() is called with no args during the reviewFlashcard function
+          // First return the test date, then for the next_review_date calculation return a future date
+          return new realDate('2025-04-15T12:00:00Z'); // Return a date 1 day in the future
+        }
+        // Pass through all other Date constructor calls
+        return new realDate(...args);
+      });
+      
+      // Act
+      const result = await reviewFlashcard(
+        supabaseMock,
+        mockUserId,
+        mockFlashcardId,
+        reviewData
+      );
+      
+      // Restore the original Date implementation
+      dateSpy.mockRestore();
+      
+      // Assert
+      expect(supabaseMock.from).toHaveBeenCalledWith('flashcards');
+      expect(supabaseMock.insert).toHaveBeenCalled();
+      expect(result).toHaveProperty('next_review_date');
+      
+      // For "łatwe" cards, the next review date should be in the future
+      const nextReviewDate = new Date(result.next_review_date);
+      expect(nextReviewDate.getTime()).toBeGreaterThan(now.getTime());
+    });
+    
+    it('should successfully review a flashcard with difficulty rating "nie_pamietam"', async () => {
+      // Arrange
+      const reviewData = {
+        difficulty_rating: 'nie_pamietam',
+        is_correct: false,
+      };
+      
+      // Mock existing review check
+      (supabaseMock.limit as any).mockReturnValue({
+        data: [],
+        error: null,
+      });
+      
+      // Act
+      const result = await reviewFlashcard(
+        supabaseMock,
+        mockUserId,
+        mockFlashcardId,
+        reviewData
+      );
+      
+      // Assert
+      expect(supabaseMock.from).toHaveBeenCalledWith('flashcards');
+      expect(supabaseMock.insert).toHaveBeenCalled();
+      expect(result).toHaveProperty('next_review_date');
+      
+      // For "nie_pamietam", the next review date should be very close to now
+      const nextReviewDate = new Date(result.next_review_date);
+      const now = new Date();
+      // Should be within 1 second
+      expect(Math.abs(nextReviewDate.getTime() - now.getTime())).toBeLessThan(1000);
+    });
+    
+    it('should update existing review record if one exists', async () => {
+      // Arrange
+      const reviewData = {
+        difficulty_rating: 'średnie',
+        is_correct: true,
+      };
+      
+      const existingReviewId = 'existing-review-id';
+      
+      // Mock existing review check to return an existing review
+      (supabaseMock.limit as any).mockReturnValue({
+        data: [{ id: existingReviewId }],
+        error: null,
+      });
+      
+      // Create a spy for the eq method to check if it's called correctly
+      const eqSpy = vi.fn().mockReturnValue({ error: null });
+      (supabaseMock.update as any).mockReturnValue({ eq: eqSpy });
+      
+      // Act
+      const result = await reviewFlashcard(
+        supabaseMock,
+        mockUserId,
+        mockFlashcardId,
+        reviewData
+      );
+      
+      // Assert
+      expect(supabaseMock.from).toHaveBeenCalledWith('flashcard_reviews');
+      expect(supabaseMock.update).toHaveBeenCalled();
+      expect(eqSpy).toHaveBeenCalledWith('id', existingReviewId);
+      expect(result).toHaveProperty('next_review_date');
+    });
+    
+    it('should throw an error when flashcard is not found', async () => {
+      // Arrange
+      const reviewData = {
+        difficulty_rating: 'łatwe',
+        is_correct: true,
+      };
+      
+      // Mock flashcard check to return no flashcard
+      (supabaseMock.single as any).mockReturnValue({
+        data: null,
+        error: { code: 'PGRST116', message: 'Not found' },
+      });
+      
+      // Act & Assert
+      await expect(
+        reviewFlashcard(supabaseMock, mockUserId, mockFlashcardId, reviewData)
+      ).rejects.toThrow('Flashcard not found');
     });
   });
 }); 

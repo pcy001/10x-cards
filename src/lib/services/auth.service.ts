@@ -114,3 +114,100 @@ export async function logoutUser(supabase: SupabaseClient): Promise<void> {
     throw error;
   }
 }
+
+/**
+ * Sends a password reset email to the user
+ *
+ * @param supabase - The Supabase client instance
+ * @param email - User's email address
+ * @param redirectTo - URL to redirect to after password reset
+ * @returns void
+ * @throws Error if the password reset request fails
+ */
+export async function resetPasswordRequest(
+  supabase: SupabaseClient,
+  email: string,
+  redirectTo?: string
+): Promise<void> {
+  try {
+    // W środowisku produkcyjnym używamy przekazanego URL lub adresu strony reset-redirect
+    // Strona reset-redirect obsłuży konwersję parametrów fragmentów URL na query params
+    const resetRedirectUrl = redirectTo
+      ? redirectTo
+      : // W środowisku serwerowym nie możemy użyć window.location
+        // Używamy domyślnego lub przekazanego URL
+        "/auth/reset-redirect";
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resetRedirectUrl,
+    });
+
+    if (error) {
+      throw new Error(`Password reset request failed: ${error.message}`);
+    }
+  } catch (error) {
+    console.error("Error during password reset request:", error);
+    throw error;
+  }
+}
+
+/**
+ * Updates user's password after reset
+ *
+ * @param supabase - The Supabase client instance
+ * @param newPassword - The new password for the user
+ * @returns void
+ * @throws Error if the password update fails
+ */
+export async function updateUserPassword(supabase: SupabaseClient, newPassword: string): Promise<void> {
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      throw new Error(`Password update failed: ${error.message}`);
+    }
+  } catch (error) {
+    console.error("Error during password update:", error);
+    throw error;
+  }
+}
+
+/**
+ * Updates user's password using a reset password token
+ *
+ * @param supabase - The Supabase client instance
+ * @param newPassword - The new password for the user
+ * @param token - The password reset token from email
+ * @returns void
+ * @throws Error if the password update fails
+ */
+export async function updateUserPasswordWithToken(
+  supabase: SupabaseClient,
+  newPassword: string,
+  token: string
+): Promise<void> {
+  try {
+    // Użyj tokenu bezpośrednio w updateUser
+    const { error } = await supabase.auth.resetPasswordForEmail("", {
+      redirectTo: window.location.origin + "/auth/reset-redirect?token=" + token,
+    });
+
+    if (error) {
+      throw new Error(`Password reset failed: ${error.message}`);
+    }
+
+    // Aktualizuj hasło
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      throw new Error(`Password update failed: ${updateError.message}`);
+    }
+  } catch (error) {
+    console.error("Error during password update with token:", error);
+    throw error;
+  }
+}

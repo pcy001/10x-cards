@@ -1,0 +1,67 @@
+---
+// Strona będzie przechwytywać linki resetowania hasła z Supabase 
+// i przekierowywać do właściwej strony reset-password
+---
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Przechwycenie fragmentu URL (parametrów po #)
+    const fragment = window.location.hash.substring(1);
+    
+    // Sprawdź czy jest to link resetowania - powinien zawierać type=recovery lub access_token
+    const isResetLink = fragment && (fragment.includes('type=recovery') || fragment.includes('access_token'));
+    
+    if (isResetLink) {
+      console.log("Wykryto link resetowania hasła, przekierowuję...");
+      
+      // Przekierowanie do strony resetowania hasła z parametrami jako query params
+      const params = new URLSearchParams(fragment);
+      const queryParams = Array.from(params.entries())
+        .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+        .join('&');
+        
+      window.location.href = `/auth/reset-password?${queryParams}`;
+    } else {
+      console.log("Brak poprawnych parametrów resetowania hasła, przekierowuję do logowania...");
+      // Jeśli nie ma fragmentu, przekieruj na stronę logowania
+      window.location.href = '/auth/login';
+    }
+  });
+</script>
+
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Przekierowywanie... | 10xCards</title>
+    <style>
+      .container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: system-ui, sans-serif;
+      }
+      .loader {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="loader"></div>
+      <p>Przekierowywanie...</p>
+    </div>
+  </body>
+</html> 

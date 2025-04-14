@@ -34,6 +34,9 @@ import Layout from "@/layouts/Layout.astro";
           <div>
             <div class="flex justify-between items-center mb-1">
               <label for="password" class="block text-sm font-medium">Hasło</label>
+              <a href="/auth/forgot-password" class="text-xs text-primary hover:underline">
+                Nie pamiętasz hasła?
+              </a>
             </div>
             <div class="relative">
               <input
@@ -87,14 +90,14 @@ import Layout from "@/layouts/Layout.astro";
 
 <script>
   // Pobranie elementów formularza
-  const loginForm = document.getElementById('login-form');
+  const loginForm = document.getElementById('login-form') as HTMLFormElement;
   const emailInput = document.getElementById('email') as HTMLInputElement;
   const passwordInput = document.getElementById('password') as HTMLInputElement;
-  const togglePasswordButton = document.getElementById('toggle-password');
+  const togglePasswordButton = document.getElementById('toggle-password') as HTMLButtonElement;
   const submitButton = document.getElementById('submit-button') as HTMLButtonElement;
-  const errorMessage = document.getElementById('error-message');
-  const registrationSuccess = document.getElementById('registration-success');
-  const dismissSuccessButton = document.getElementById('dismiss-success');
+  const errorMessage = document.getElementById('error-message') as HTMLDivElement;
+  const registrationSuccess = document.getElementById('registration-success') as HTMLDivElement;
+  const dismissSuccessButton = document.getElementById('dismiss-success') as HTMLButtonElement;
 
   // Sprawdzenie, czy w URL jest informacja o udanej rejestracji
   const searchParams = new URLSearchParams(window.location.search);
@@ -104,6 +107,15 @@ import Layout from "@/layouts/Layout.astro";
     // Usuń parametr z URL
     const url = new URL(window.location.href);
     url.searchParams.delete('registered');
+    window.history.replaceState({}, '', url.toString());
+  }
+
+  // Sprawdzenie, czy w URL jest informacja o udanym resecie hasła
+  if (searchParams.has('reset') && searchParams.get('reset') === 'success') {
+    // Możemy dodać komunikat o udanym resecie hasła, jeśli chcemy
+    // Usuń parametr z URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('reset');
     window.history.replaceState({}, '', url.toString());
   }
 
@@ -186,7 +198,7 @@ import Layout from "@/layouts/Layout.astro";
   });
   
   // Funkcja wyświetlająca komunikat o błędzie
-  function showError(message) {
+  function showError(message: string): void {
     errorMessage.textContent = message;
     errorMessage.classList.remove('hidden');
   }
