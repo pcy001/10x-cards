@@ -105,7 +105,7 @@ test.describe("E2E Test Suite", () => {
     return flashcard;
   }
 
-  // Funkcja czyszcząca tabelę flashcards
+  // Funkcja czyszcząca tabelę flashcards i learning_sessions
   async function cleanupFlashcardsTable() {
     try {
       // Zaloguj się, jeśli nie mamy jeszcze tokenu
@@ -120,20 +120,32 @@ test.describe("E2E Test Suite", () => {
         },
       });
 
-      console.log("[CLEANUP] Running full flashcards table cleanup...");
+      console.log("[CLEANUP] Running full database cleanup...");
 
-      // Pełne czyszczenie tabeli - zapytanie DELETE bez WHERE dla wszystkich flashcards użytkownika testowego
-      const { error } = await cleanupClient.from("flashcards").delete().not("user_id", "is", null);
+      // 1. Najpierw usuń sesje nauki
+      const { error: sessionsError } = await cleanupClient
+        .from("learning_sessions")
+        .delete()
+        .not("user_id", "is", null);
 
-      if (error) {
-        console.error("[CLEANUP] Failed to clean flashcards table:", error);
+      if (sessionsError) {
+        console.error("[CLEANUP] Failed to clean learning_sessions table:", sessionsError);
+      } else {
+        console.log("[CLEANUP] Successfully cleaned learning_sessions table");
+      }
+
+      // 2. Potem usuń fiszki
+      const { error: flashcardsError } = await cleanupClient.from("flashcards").delete().not("user_id", "is", null);
+
+      if (flashcardsError) {
+        console.error("[CLEANUP] Failed to clean flashcards table:", flashcardsError);
       } else {
         console.log("[CLEANUP] Successfully cleaned flashcards table");
         // Wyczyść też tablicę śledzącą
         createdFlashcardIds = [];
       }
     } catch (e) {
-      console.error("[CLEANUP] Error during table cleanup:", e);
+      console.error("[CLEANUP] Error during database cleanup:", e);
     }
   }
 
