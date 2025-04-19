@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenerationStatusProps, GenerationStatusType } from './types';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 
 export default function GenerationStatus({

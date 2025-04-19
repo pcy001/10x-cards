@@ -4,7 +4,7 @@ import EmailInput from './EmailInput';
 import PasswordInput from './PasswordInput';
 import FormError from './FormError';
 import LoginLink from './LoginLink';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function RegisterForm() {
   const {

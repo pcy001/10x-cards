@@ -4,7 +4,7 @@ import EmailInput from './EmailInput';
 import PasswordInput from './PasswordInput';
 import FormError from './FormError';
 import RegisterLink from './RegisterLink';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { CheckCircle2, XCircle } from 'lucide-react';
 
 export default function LoginForm() {

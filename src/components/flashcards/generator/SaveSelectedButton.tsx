@@ -1,7 +1,7 @@
 import React from 'react';
 import { SaveSelectedButtonProps } from './types';
 import { Save } from 'lucide-react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function SaveSelectedButton({
   onClick,

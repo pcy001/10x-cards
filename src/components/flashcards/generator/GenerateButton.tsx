@@ -1,7 +1,7 @@
 import React from 'react';
 import { GenerateButtonProps } from './types';
 import { Sparkles } from 'lucide-react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function GenerateButton({
   onClick,

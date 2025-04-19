@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useUser } from "@/hooks/useUser";
-import { Spinner } from "./ui/Spinner";
+import { Spinner } from "./ui/spinner";
 
 // Tworzę QueryClient jako singletonową instancję poza komponentem
 // aby zapobiec tworzeniu wielu instancji
