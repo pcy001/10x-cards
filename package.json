@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "astro dev",
     "dev:test": "astro dev --env-file=.env.test",
+    "dev:local": "concurrently \"supabase start\" \"astro dev\"",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
@@ -50,6 +54,7 @@
     "@typescript-eslint/eslint-plugin": "8.28.0",
     "@typescript-eslint/parser": "8.28.0",
     "@vitest/coverage-v8": "^3.1.1",
+    "concurrently": "^9.1.2",
     "dotenv": "^16.5.0",
     "eslint": "9.23.0",
     "eslint-config-prettier": "10.1.1",
