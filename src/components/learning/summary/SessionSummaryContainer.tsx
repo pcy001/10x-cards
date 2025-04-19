@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { useSummaryData } from './useSummaryData';
 import { SummaryHeader } from './SummaryHeader';
 import { StatisticsDisplay } from './StatisticsDisplay';

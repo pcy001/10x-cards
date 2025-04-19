@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useLearningSession } from '@/hooks/useLearningSession';
-import { Spinner } from '@/components/ui/Spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { Book, CheckCircle, XCircle, SkipForward, ChevronRight } from 'lucide-react';
 import { difficultyLabels, difficultyCorrectness } from '@/hooks/useLearningSession';
 import type { DifficultyRating } from '@/types';
