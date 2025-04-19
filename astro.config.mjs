@@ -15,12 +15,18 @@ export default defineConfig({
   output: "server",
   integrations: [react(), sitemap()],
   server: { port: 3000 },
+  experimental: {
+    session: true,
+  },
   vite: {
     plugins: [tailwindcss()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+    },
+    ssr: {
+      noExternal: ["react-router-dom", "@tanstack/react-query"],
     },
   },
   adapter: node({
