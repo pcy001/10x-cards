@@ -61,6 +61,8 @@ jobs:
       PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       CF_PAGES: 1
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,17 +70,14 @@ jobs:
       - name: Setup Node.js and Install Dependencies
         uses: ./.github/actions/setup-node
 
+      - name: Install Wrangler CLI
+        run: npm install -g wrangler
+
       - name: Build for Cloudflare
         run: npm run build:cf
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: 10x-cards
-          directory: dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        run: npx wrangler pages deploy dist --project-name=10x-cards
 
   status-notification:
     name: Deployment Status
