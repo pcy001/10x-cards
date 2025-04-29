@@ -1,0 +1,106 @@
+---
+name: Cloudflare Deployment
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and Install Dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run linting
+        run: npm run lint
+        continue-on-error: true
+
+  unit-test:
+    name: Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and Install Dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: coverage/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: [lint, unit-test]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and Install Dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Build project
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 10x-cards
+          directory: dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  deployment-status:
+    name: Deployment Status
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Create status comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const deployStatus = '${{ needs.deploy.result }}';
+            
+            const succeeded = deployStatus === 'success';
+            const status = succeeded ? 'succeeded' : 'failed';
+            const url = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            
+            const message = `Deployment to Cloudflare Pages ${status}. [See details](${url})`;
+            
+            // Create a new issue comment with the status
+            if (context.payload.pull_request) {
+              github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: message
+              });
+            } 

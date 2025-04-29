@@ -1,24 +1,26 @@
-name: "Setup Node.js Environment"
-description: "Setup Node.js with caching for dependencies"
-
-inputs:
-  node-version-file:
-    description: "Path to the .nvmrc file"
-    required: false
-    default: '.nvmrc'
-  cache-npm:
-    description: "Cache npm dependencies"
-    required: false
-    default: 'true'
+name: 'Setup Node.js and Install Dependencies'
+description: 'Sets up Node.js environment and installs dependencies'
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
+    - name: Check if .nvmrc exists
+      id: check_nvmrc
+      shell: bash
+      run: |
+        if [ -f ".nvmrc" ]; then
+          echo "nvmrc_exists=true" >> $GITHUB_OUTPUT
+          echo "node_version=$(cat .nvmrc)" >> $GITHUB_OUTPUT
+        else
+          echo "nvmrc_exists=false" >> $GITHUB_OUTPUT
+          echo "node_version=20" >> $GITHUB_OUTPUT
+        fi
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version-file: ${{ inputs.node-version-file }}
-        cache: ${{ inputs.cache-npm == 'true' && 'npm' || '' }}
+        node-version: ${{ steps.check_nvmrc.outputs.node_version }}
+        cache: 'npm'
 
     - name: Install dependencies
       shell: bash

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/assets/*",
+    "/_astro/*",
+    "/favicon.ico",
+    "/robots.txt"
+  ],
+  "routes": [
+    {
+      "src": "^/api/.*$",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "^/((?!api/).*)$",
+      "dest": "/"
+    }
+  ]
+} 
