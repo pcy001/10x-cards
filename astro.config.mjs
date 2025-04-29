@@ -11,7 +11,10 @@ import cloudflare from "@astrojs/cloudflare";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Sprawdź czy jesteśmy w środowisku Cloudflare
-const CF_PAGES = import.meta.env?.CF_PAGES === "1";
+// WAŻNE: Używamy process.env, ponieważ import.meta.env jest dostępne tylko w czasie działania aplikacji,
+// a nie podczas budowania. CF_PAGES to zmienna środowiskowa ustawiana w CI/CD
+const CF_PAGES = process.env.CF_PAGES === "1";
+console.log(`Building with CF_PAGES=${CF_PAGES}`);
 
 // https://astro.build/config
 export default defineConfig({

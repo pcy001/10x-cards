@@ -75,9 +75,19 @@ jobs:
           echo "Checking environment variables (not showing values)"
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "ERROR: CLOUDFLARE_API_TOKEN is not set!"; else echo "CLOUDFLARE_API_TOKEN is set"; fi
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "ERROR: CLOUDFLARE_ACCOUNT_ID is not set!"; else echo "CLOUDFLARE_ACCOUNT_ID is set"; fi
+          echo "CF_PAGES=${CF_PAGES}"
 
       - name: Build for Cloudflare
-        run: npm run build:cf
+        run: |
+          echo "Building with CF_PAGES=${CF_PAGES}"
+          CF_PAGES=1 npm run build:cf
+
+      - name: Verify build output
+        run: |
+          echo "Checking build output"
+          ls -la ./dist
+          echo "Checking for _worker.js (required for Cloudflare Pages)"
+          find ./dist -name "_worker.js" || echo "Missing _worker.js!"
 
       - name: Deploy to Cloudflare Pages
         run: |
