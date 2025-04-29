@@ -1,0 +1,14 @@
+name = "10x-cards"
+compatibility_date = "2025-04-29"
+
+[site]
+bucket = "./dist"
+
+[build]
+command = "npm run build:cf"
+
+[env.production]
+name = "10x-cards-production"
+
+[env.preview]
+name = "10x-cards-preview" 

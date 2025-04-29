@@ -49,7 +49,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  build:
+  build-deploy:
     name: Build and Deploy
     needs: [unit-test]
     runs-on: ubuntu-latest
@@ -60,6 +60,7 @@ jobs:
       PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      CF_PAGES: 1
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -78,11 +79,10 @@ jobs:
           projectName: 10x-cards
           directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          branch: main # Domyślna gałąź dla środowiska produkcyjnego w Cloudflare Pages
 
   status-notification:
     name: Deployment Status
-    needs: [lint, unit-test, build]
+    needs: [lint, unit-test, build-deploy]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -92,7 +92,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const unitStatus = '${{ needs.unit-test.result }}';
-            const buildStatus = '${{ needs.build.result }}';
+            const buildStatus = '${{ needs.build-deploy.result }}';
             const allPassed = unitStatus === 'success' && buildStatus === 'success';
             
             const status = allPassed ? 'succeeded' : 'failed';

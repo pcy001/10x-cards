@@ -10,6 +10,8 @@ import node from "@astrojs/node";
 import cloudflare from "@astrojs/cloudflare";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Sprawdź czy jesteśmy w środowisku Cloudflare
+const CF_PAGES = import.meta.env?.CF_PAGES === "1";
 
 // https://astro.build/config
 export default defineConfig({
@@ -29,18 +31,11 @@ export default defineConfig({
     ssr: {
       noExternal: ["react-router-dom", "@tanstack/react-query"],
     },
+    define: {
+      // Dodaj zmienne środowiskowe do klienta
+      "import.meta.env.CF_PAGES": JSON.stringify(CF_PAGES),
+    },
   },
-  // Wybieramy adapter w zależności od środowiska
-  adapter:
-    process.env.CF_PAGES === "1"
-      ? cloudflare({
-          mode: "advanced", // Wspiera middleware
-          runtime: {
-            mode: "local",
-            persistTo: "./.cloudflare/state", // Dla lokalnego stanu
-          },
-        })
-      : node({
-          mode: "standalone",
-        }),
+  // Wybieramy adapter w zależności od środowiska budowania
+  adapter: CF_PAGES ? cloudflare() : node({ mode: "standalone" }),
 });
