@@ -82,7 +82,7 @@ jobs:
       - name: Deploy to Cloudflare Pages
         run: |
           echo "Starting deployment to Cloudflare Pages..."
-          npx wrangler pages deploy dist --project-name=10x-cards --production
+          npx wrangler pages deploy dist --project-name=10x-cards --branch=master
 
   status-notification:
     name: Deployment Status
