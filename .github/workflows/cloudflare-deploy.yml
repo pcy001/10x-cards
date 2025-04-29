@@ -1,0 +1,109 @@
+---
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [master]
+
+# Uprawnienia dla GITHUB_TOKEN
+permissions:
+  contents: read
+  deployments: write
+  statuses: write
+
+# Wyodrębnione powtarzalne kroki jako reużywalne komponenty
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and Install Dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run linting
+        run: npm run lint
+        continue-on-error: true
+
+  unit-test:
+    name: Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and Install Dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: coverage/
+          retention-days: 7
+
+  build:
+    name: Build and Deploy
+    needs: [unit-test]
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js and Install Dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Build for Cloudflare
+        run: npm run build:cf
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 10x-cards
+          directory: dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: main # Domyślna gałąź dla środowiska produkcyjnego w Cloudflare Pages
+
+  status-notification:
+    name: Deployment Status
+    needs: [lint, unit-test, build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Create status notification
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const unitStatus = '${{ needs.unit-test.result }}';
+            const buildStatus = '${{ needs.build.result }}';
+            const allPassed = unitStatus === 'success' && buildStatus === 'success';
+            
+            const status = allPassed ? 'succeeded' : 'failed';
+            const url = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            
+            github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: allPassed ? 'success' : 'failure',
+              target_url: url,
+              description: `Deployment ${status}`,
+              context: 'Cloudflare Pages Deployment'
+            }); 

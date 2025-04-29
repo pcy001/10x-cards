@@ -6,11 +6,14 @@
     "dev": "astro dev",
     "dev:test": "astro dev --env-file=.env.test",
     "dev:local": "concurrently \"supabase start\" \"astro dev\"",
+    "dev:cf": "CF_PAGES=1 astro dev",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "build": "astro build",
+    "build:cf": "CF_PAGES=1 astro build",
     "preview": "astro preview",
+    "preview:cf": "npx wrangler pages dev ./dist",
     "astro": "astro",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -46,6 +49,7 @@
     "tw-animate-css": "^1.2.5"
   },
   "devDependencies": {
+    "@astrojs/cloudflare": "^12.5.1",
     "@eslint/compat": "1.2.7",
     "@eslint/js": "9.23.0",
     "@playwright/test": "^1.51.1",
@@ -71,7 +75,8 @@
     "lint-staged": "15.5.0",
     "prettier-plugin-astro": "0.14.1",
     "typescript-eslint": "8.28.0",
-    "vitest": "^3.1.1"
+    "vitest": "^3.1.1",
+    "wrangler": "^4.13.2"
   },
   "lint-staged": {
     "*.{ts,tsx,astro}": [

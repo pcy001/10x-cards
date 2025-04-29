@@ -7,6 +7,7 @@ import react from "@astrojs/react";
 import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
 import node from "@astrojs/node";
+import cloudflare from "@astrojs/cloudflare";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +30,17 @@ export default defineConfig({
       noExternal: ["react-router-dom", "@tanstack/react-query"],
     },
   },
-  adapter: node({
-    mode: "standalone",
-  }),
+  // Wybieramy adapter w zależności od środowiska
+  adapter:
+    process.env.CF_PAGES === "1"
+      ? cloudflare({
+          mode: "advanced", // Wspiera middleware
+          runtime: {
+            mode: "local",
+            persistTo: "./.cloudflare/state", // Dla lokalnego stanu
+          },
+        })
+      : node({
+          mode: "standalone",
+        }),
 });
