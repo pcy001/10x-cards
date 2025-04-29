@@ -14,7 +14,7 @@
     "build:cf": "CF_PAGES=1 astro build",
     "preview": "astro preview",
     "preview:cf": "wrangler pages dev ./dist",
-    "deploy:cf": "wrangler pages deploy ./dist",
+    "deploy:cf": "wrangler pages deploy ./dist --project-name=10x-cards",
     "astro": "astro",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

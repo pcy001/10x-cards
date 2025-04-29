@@ -1,11 +1,10 @@
 name = "10x-cards"
 compatibility_date = "2025-04-29"
 
-[site]
-bucket = "./dist"
-
-[build]
-command = "npm run build:cf"
+# Konfiguracja Cloudflare Pages
+[pages]
+project_name = "10x-cards"
+build_output_dir = "dist"
 
 [env.production]
 name = "10x-cards-production"
