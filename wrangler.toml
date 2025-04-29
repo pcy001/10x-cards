@@ -1,11 +1,11 @@
 name = "10x-cards"
 compatibility_date = "2025-04-29"
+pages_build_output_dir = "dist"
 
 # Konfiguracja Cloudflare Pages
 [pages]
 project_name = "10x-cards"
 build_output_dir = "dist"
-pages_build_output_dir = "dist"
 
 [env.production]
 name = "10x-cards-production"
