@@ -70,14 +70,34 @@ jobs:
       - name: Setup Node.js and Install Dependencies
         uses: ./.github/actions/setup-node
 
+      - name: Check environment variables
+        run: |
+          echo "Checking if CLOUDFLARE_API_TOKEN is set (not showing value)"
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "CLOUDFLARE_API_TOKEN is not set!"; else echo "CLOUDFLARE_API_TOKEN is set"; fi
+          echo "Checking if CLOUDFLARE_ACCOUNT_ID is set (not showing value)"
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "CLOUDFLARE_ACCOUNT_ID is not set!"; else echo "CLOUDFLARE_ACCOUNT_ID is set"; fi
+
       - name: Install Wrangler CLI
         run: npm install -g wrangler
+
+      - name: Login to Cloudflare
+        run: echo $CLOUDFLARE_API_TOKEN | npx wrangler login
 
       - name: Build for Cloudflare
         run: npm run build:cf
 
+      - name: Debug Cloudflare Projects
+        run: |
+          echo "Checking Cloudflare authentication..."
+          echo "Using account ID: $CLOUDFLARE_ACCOUNT_ID"
+          npx wrangler whoami
+          echo "Listing projects..."
+          npx wrangler pages project list
+
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy dist --project-name=10x-cards
+        run: |
+          echo "Starting deployment to Cloudflare Pages..."
+          npx wrangler pages deploy dist --project-name=10x-cards --no-throw --token=$CLOUDFLARE_API_TOKEN --account-id=$CLOUDFLARE_ACCOUNT_ID
 
   status-notification:
     name: Deployment Status
