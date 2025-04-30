@@ -88,6 +88,9 @@ jobs:
           E2E_PASSWORD=${{ secrets.E2E_PASSWORD }}
           EOL
 
+      - name: Install adapters
+        run: npm install @astrojs/node@9.0.0 --save-exact
+
       - name: Run E2E tests
         run: npm run test:e2e
 

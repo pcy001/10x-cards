@@ -1,6 +1,9 @@
 # wrangler.toml
 name = "10x-cards"
-compatibility_date = "2024-07-01"
+compatibility_date = "2024-01-01"
+
+# Konfiguracja Workers
+workers_dev = true
 
 [site]
 bucket = "./dist"

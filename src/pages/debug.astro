@@ -1,0 +1,27 @@
+---
+// Strona do debugowania środowiska Cloudflare
+---
+
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Debug - Cloudflare Environment</title>
+</head>
+<body>
+  <h1>Debug środowiska Cloudflare</h1>
+  
+  <h2>Zmienne środowiskowe</h2>
+  <pre>
+    CLOUDFLARE_PAGES: {import.meta.env.CLOUDFLARE_PAGES ? 'true' : 'false'}
+    CF_PAGES: {import.meta.env.CF_PAGES ? 'true' : 'false'}
+  </pre>
+  
+  <h2>Informacje o platformie</h2>
+  <pre>
+    Runtime: {import.meta.env.SSR ? 'Server' : 'Client'}
+    Output Mode: Server
+    Adapter: Cloudflare
+  </pre>
+</body>
+</html> 
