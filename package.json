@@ -10,8 +10,8 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "build": "astro build",
-    "build:cloudflare": "CLOUDFLARE_PAGES=true ./node_modules/.bin/astro build",
-    "build:test": "astro build --config astro.test.config.mjs",
+    "build:cloudflare": "CLOUDFLARE_PAGES=true CLOUDFLARE_KV_BINDING_SESSION=true ./node_modules/.bin/astro build",
+    "build:test": "NODE_ENV=test astro build --config astro.test.config.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "lint": "eslint .",
@@ -21,8 +21,9 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "npm run build:test && playwright test",
-    "test:e2e:ui": "npm run build:test && playwright test --ui"
+    "test:e2e": "NODE_ENV=test astro dev --config astro.test.config.mjs --port 4321 & sleep 5 && playwright test; kill $!",
+    "test:e2e:ui": "NODE_ENV=test astro dev --config astro.test.config.mjs --port 4321 & sleep 5 && playwright test --ui; kill $!",
+    "test:e2e:skip-build": "playwright test"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.5.1",
