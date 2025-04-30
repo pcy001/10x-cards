@@ -35,8 +35,10 @@ export default defineConfig({
       SUPABASE_URL: { context: "server", access: "secret", type: "string" },
       SUPABASE_KEY: { context: "server", access: "secret", type: "string" },
       OPENROUTER_API_KEY: { context: "server", access: "secret", type: "string" },
-      PUBLIC_SUPABASE_URL: { context: "client", access: "public", type: "string" },
-      PUBLIC_SUPABASE_ANON_KEY: { context: "client", access: "public", type: "string" },
+      PUBLIC_SUPABASE_URL: { context: "client", access: "public", type: "string", default: "" },
+      PUBLIC_SUPABASE_ANON_KEY: { context: "client", access: "public", type: "string", default: "" },
     },
+    // Opcjonalnie możemy wyłączyć walidację, jeśli domyślne wartości nie pomogą
+    validateSecrets: true,
   },
 });
