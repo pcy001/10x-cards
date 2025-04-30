@@ -1,0 +1,185 @@
+---
+// Diagnostyczna strona do debugowania środowiska Cloudflare
+---
+
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width" />
+  <title>Diagnostyka środowiska Cloudflare</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      line-height: 1.5;
+      padding: 2rem;
+    }
+    h1 { color: #0055b3; }
+    h2 { color: #0077cc; margin-top: 2rem; }
+    pre {
+      background-color: #f4f4f4;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Diagnostyka środowiska Cloudflare</h1>
+  
+  <div class="card">
+    <h2>Informacje o platformie</h2>
+    <ul>
+      <li>Runtime: {import.meta.env.SSR ? 'Server' : 'Client'}</li>
+      <li>Output Mode: {import.meta.env.MODE === 'development' ? 'Development' : 'Production'}</li>
+      <li>MessageChannel dostępny: <span id="message-channel-status">sprawdzanie...</span></li>
+      <li>Supabase API dostępne: <span id="supabase-status">sprawdzanie...</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Zmienne środowiskowe</h2>
+    <ul>
+      <li>SUPABASE_URL: {import.meta.env.SUPABASE_URL ? '✓' : '✗'}</li>
+      <li>PUBLIC_SUPABASE_URL: {import.meta.env.PUBLIC_SUPABASE_URL ? '✓' : '✗'}</li>
+      <li>CLOUDFLARE_KV_BINDING_SESSION: {import.meta.env.CLOUDFLARE_KV_BINDING_SESSION ? '✓' : '✗'}</li>
+      <li>CF_PAGES: {import.meta.env.CF_PAGES ? '✓' : '✗'}</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Response z API Diagnostycznego</h2>
+    <button id="fetch-data">Pobierz dane diagnostyczne</button>
+    <pre id="diagnostic-data">Kliknij przycisk, aby pobrać dane...</pre>
+  </div>
+
+  <div class="card">
+    <h2>Response z API Autentykacji</h2>
+    <button id="check-auth">Sprawdź endpoint autentykacji</button>
+    <pre id="auth-data">Kliknij przycisk, aby sprawdzić endpoint...</pre>
+  </div>
+
+  <script>
+    // Sprawdź dostępność MessageChannel
+    const messageChannelStatus = document.getElementById('message-channel-status');
+    if (messageChannelStatus) {
+      messageChannelStatus.textContent = typeof MessageChannel !== 'undefined' ? 'Tak ✓' : 'Nie ✗';
+    }
+      
+    // Sprawdź czy Supabase API jest dostępne
+    fetch('/api/debug/environment')
+      .then(response => response.json())
+      .then(data => {
+        const supabaseStatus = document.getElementById('supabase-status');
+        if (supabaseStatus) {
+          supabaseStatus.textContent = data.runtime.supabase === 'Connected' ? 'Tak ✓' : 'Nie ✗';
+        }
+      })
+      .catch(error => {
+        const supabaseStatus = document.getElementById('supabase-status');
+        if (supabaseStatus) {
+          supabaseStatus.textContent = `Błąd: ${error.message}`;
+          supabaseStatus.className = 'error';
+        }
+      });
+
+    // Po załadowaniu dokumentu
+    document.addEventListener('DOMContentLoaded', () => {
+      // Wypełnij informacje o platformie
+      const platformInfo = document.getElementById('platform-info');
+      if (platformInfo) {
+        platformInfo.textContent = JSON.stringify({
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+          platform: navigator.platform,
+          vendor: navigator.vendor,
+          cookieEnabled: navigator.cookieEnabled,
+        }, null, 2);
+      }
+
+      // Podłącz przycisk do kopiowania danych
+      const copyButton = document.getElementById('copy-data');
+      if (copyButton) {
+        copyButton.addEventListener('click', () => {
+          const diagnosticData = document.getElementById('diagnostic-data');
+          if (diagnosticData && diagnosticData.textContent) {
+            navigator.clipboard.writeText(diagnosticData.textContent)
+              .then(() => {
+                const copyStatus = document.getElementById('copy-status');
+                if (copyStatus) {
+                  copyStatus.textContent = 'Skopiowano!';
+                  setTimeout(() => {
+                    const updatedCopyStatus = document.getElementById('copy-status');
+                    if (updatedCopyStatus) {
+                      updatedCopyStatus.textContent = '';
+                    }
+                  }, 2000);
+                }
+              })
+              .catch((err: unknown) => {
+                console.error('Błąd kopiowania: ', err);
+                const copyStatus = document.getElementById('copy-status');
+                if (copyStatus) {
+                  copyStatus.textContent = 'Błąd kopiowania!';
+                }
+              });
+          }
+        });
+      }
+
+      // Podłącz przycisk do pobierania danych diagnostycznych
+      const fetchDataButton = document.getElementById('fetch-data');
+      if (fetchDataButton) {
+        fetchDataButton.addEventListener('click', async () => {
+          const resultElement = document.getElementById('diagnostic-data');
+          if (!resultElement) return;
+          
+          try {
+            resultElement.textContent = 'Pobieranie danych...';
+            const response = await fetch('/api/debug/environment');
+            const data = await response.json();
+            resultElement.textContent = JSON.stringify(data, null, 2);
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            resultElement.textContent = `Błąd: ${errorMessage}`;
+            resultElement.className = 'error';
+          }
+        });
+      }
+
+      // Podłącz przycisk do sprawdzania endpointu autentykacji
+      const checkAuthButton = document.getElementById('check-auth');
+      if (checkAuthButton) {
+        checkAuthButton.addEventListener('click', async () => {
+          const resultElement = document.getElementById('auth-data');
+          if (!resultElement) return;
+          
+          try {
+            resultElement.textContent = 'Sprawdzanie endpointu...';
+            const response = await fetch('/api/auth/me');
+            resultElement.textContent = `Status: ${response.status}\n\n`;
+            try {
+              const data = await response.json();
+              resultElement.textContent += JSON.stringify(data, null, 2);
+            } catch (e) {
+              resultElement.textContent += 'Odpowiedź nie jest w formacie JSON';
+            }
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            resultElement.textContent = `Błąd: ${errorMessage}`;
+            resultElement.className = 'error';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html> 

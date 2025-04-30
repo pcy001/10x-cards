@@ -9,10 +9,15 @@ workers_dev = true
 bucket = "./dist"
 
 # Define KV namespace for session storage
-# Dla środowiska CI, tworzymy "previews" KV namespace
+# For CI/CD, we're using the preview key to avoid requiring a real KV namespace
 kv_namespaces = [
   { binding = "SESSION", preview_id = "SESSION" } 
 ]
+
+# Zmienne w produkcji są definiowane za pomocą Cloudflare Dashboard
+# lub przez wrangler secrets
+[vars]
+CLOUDFLARE_KV_BINDING_SESSION = "true"
 
 [[env.production.vars]]
 SUPABASE_URL = ""
