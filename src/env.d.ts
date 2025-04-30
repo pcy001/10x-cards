@@ -12,30 +12,41 @@ declare global {
   }
 }
 
-// Zastosowanie astro:env do deklaracji zmiennych środowiskowych
-type EnvSchema = {
-  // Supabase
-  SUPABASE_URL: string;
-  SUPABASE_KEY: string;
-  PUBLIC_SUPABASE_URL: string;
-  PUBLIC_SUPABASE_ANON_KEY: string;
-  
-  // OpenRouter
-  OPENROUTER_API_KEY: string;
-  
-  // Inne zmienne środowiskowe
-  // ...
+// Deklaracja typów dla zmiennych środowiskowych zgodna z Astro 5
+interface ImportMetaEnv {
+  readonly SUPABASE_URL: string;
+  readonly SUPABASE_KEY: string;
+  readonly OPENROUTER_API_KEY: string;
+  readonly PUBLIC_SUPABASE_URL: string;
+  readonly PUBLIC_SUPABASE_ANON_KEY: string;
+  // more env variables...
 }
 
-type RuntimeEnv = "development" | "production" | "test";
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
 
-// Dostarcza typowanie dla importu z 'astro:env'
+// Deklaracje dla modułu astro:env w Astro 5
 declare module 'astro:env' {
-  export const SUPABASE_URL: string;
-  export const SUPABASE_KEY: string;
-  export const PUBLIC_SUPABASE_URL: string;
-  export const PUBLIC_SUPABASE_ANON_KEY: string;
-  export const OPENROUTER_API_KEY: string;
+  // Zmienna dostępne tylko po stronie serwera
+  export type SecretValues = {
+    readonly SUPABASE_URL: string;
+    readonly SUPABASE_KEY: string;
+    readonly OPENROUTER_API_KEY: string;
+  }
+
+  // Zmienne publiczne dostępne również po stronie klienta
+  export type PublicValues = {
+    readonly PUBLIC_SUPABASE_URL: string;
+    readonly PUBLIC_SUPABASE_ANON_KEY: string;
+  }
+
+  // Eksporty typów i getów
+  export type Secret<Param extends keyof SecretValues> = SecretValues[Param];
+  export type Public<Param extends keyof PublicValues> = PublicValues[Param];
+  
+  export function getSecret<Param extends keyof SecretValues>(key: Param): Secret<Param>;
+  export function getPublic<Param extends keyof PublicValues>(key: Param): Public<Param>;
 }
 
 // Deklaracje dla Cloudflare

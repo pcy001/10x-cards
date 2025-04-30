@@ -2,9 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import { supabaseClient } from "../db/supabase.client";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../db/database.types";
-
-// Import zmiennych środowiskowych z Astro
-import { SUPABASE_URL, SUPABASE_KEY, PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from 'astro:env';
+import * as env from 'astro:env';
 
 // Adresy URL, które nie wymagają uwierzytelnienia
 const PUBLIC_PATHS = [
@@ -45,9 +43,23 @@ export const onRequest = defineMiddleware(async ({ request, locals, redirect }, 
       if (!supabaseClient) {
         console.error('[Middleware] Supabase client not initialized from import');
         
-        // Próba utworzenia nowego klienta jako fallback
-        const supabaseUrl = SUPABASE_URL || PUBLIC_SUPABASE_URL || '';
-        const supabaseKey = SUPABASE_KEY || PUBLIC_SUPABASE_ANON_KEY || '';
+        // Próbuj użyć astro:env
+        let supabaseUrl = '';
+        let supabaseKey = '';
+        
+        try {
+          // Spróbuj pobrać z astro:env
+          supabaseUrl = env.getSecret('SUPABASE_URL');
+          supabaseKey = env.getSecret('SUPABASE_KEY');
+        } catch (e) {
+          // Fallback do import.meta.env
+          supabaseUrl = typeof import.meta !== 'undefined' && import.meta.env 
+            ? (import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || '')
+            : '';
+          supabaseKey = typeof import.meta !== 'undefined' && import.meta.env 
+            ? (import.meta.env.SUPABASE_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '')
+            : '';
+        }
         
         console.log(`[Middleware] Environment variables availability: SUPABASE_URL=${!!supabaseUrl}, SUPABASE_KEY=${!!supabaseKey}`);
         

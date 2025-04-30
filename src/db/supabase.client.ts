@@ -1,12 +1,28 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import * as env from 'astro:env';
 
-// Import zmiennych środowiskowych z Astro
-import { SUPABASE_URL, SUPABASE_KEY, PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from 'astro:env';
+let supabaseUrl = '';
+let supabaseKey = '';
 
-// Pobierz URL i klucz używając zmiennych dostarczonych przez Astro
-const supabaseUrl = SUPABASE_URL || PUBLIC_SUPABASE_URL || '';
-const supabaseKey = SUPABASE_KEY || PUBLIC_SUPABASE_ANON_KEY || '';
+// Próba pobrania zmiennych z astro:env
+try {
+  supabaseUrl = env.getSecret('SUPABASE_URL');
+} catch (e) {
+  // Fallback do standardowego import.meta.env
+  supabaseUrl = typeof import.meta !== 'undefined' && import.meta.env 
+    ? (import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || '')
+    : '';
+}
+
+try {
+  supabaseKey = env.getSecret('SUPABASE_KEY');
+} catch (e) {
+  // Fallback do standardowego import.meta.env
+  supabaseKey = typeof import.meta !== 'undefined' && import.meta.env 
+    ? (import.meta.env.SUPABASE_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '')
+    : '';
+}
 
 // Sprawdź czy zmienne są zdefiniowane
 if (!supabaseUrl) {
