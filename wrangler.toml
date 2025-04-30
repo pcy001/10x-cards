@@ -1,0 +1,22 @@
+# wrangler.toml
+name = "10x-cards"
+compatibility_date = "2024-07-01"
+
+[site]
+bucket = "./dist"
+
+# Define KV namespace for session storage
+# Note: You need to create a KV namespace first using `wrangler kv:namespace create SESSION`
+# and then replace the ID below with the ID from that command
+# kv_namespaces = [
+#   { binding = "SESSION", id = "XXXXXXXX" } 
+# ]
+
+[[env.production.vars]]
+SUPABASE_URL = ""
+PUBLIC_SUPABASE_URL = ""
+
+# Secrets are defined in the Cloudflare dashboard or using wrangler
+# wrangler secret put SUPABASE_KEY
+# wrangler secret put PUBLIC_SUPABASE_ANON_KEY
+# wrangler secret put OPENROUTER_API_KEY
