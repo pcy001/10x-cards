@@ -2,7 +2,28 @@ import { defineMiddleware } from "astro:middleware";
 import { supabaseClient } from "../db/supabase.client";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../db/database.types";
-import * as env from 'astro:env';
+
+// Funkcja pomocnicza do pobrania zmiennych środowiskowych
+function getEnv(name: string, fallback: string = ''): string {
+  // Sprawdź import.meta.env (działa zarówno w dev, build, jak i testach)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    const value = import.meta.env[name];
+    if (value) return value;
+  }
+  
+  // Sprawdź process.env (Node.js)
+  if (typeof process !== 'undefined' && process.env) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  
+  // Sprawdź globalne self (Cloudflare Workers)
+  if (typeof self !== 'undefined' && (self as any)[name]) {
+    return (self as any)[name];
+  }
+  
+  return fallback;
+}
 
 // Adresy URL, które nie wymagają uwierzytelnienia
 const PUBLIC_PATHS = [
@@ -43,23 +64,9 @@ export const onRequest = defineMiddleware(async ({ request, locals, redirect }, 
       if (!supabaseClient) {
         console.error('[Middleware] Supabase client not initialized from import');
         
-        // Próbuj użyć astro:env
-        let supabaseUrl = '';
-        let supabaseKey = '';
-        
-        try {
-          // Spróbuj pobrać z astro:env
-          supabaseUrl = env.getSecret('SUPABASE_URL');
-          supabaseKey = env.getSecret('SUPABASE_KEY');
-        } catch (e) {
-          // Fallback do import.meta.env
-          supabaseUrl = typeof import.meta !== 'undefined' && import.meta.env 
-            ? (import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL || '')
-            : '';
-          supabaseKey = typeof import.meta !== 'undefined' && import.meta.env 
-            ? (import.meta.env.SUPABASE_KEY || import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '')
-            : '';
-        }
+        // Pobierz zmienne z różnych źródeł
+        const supabaseUrl = getEnv('SUPABASE_URL') || getEnv('PUBLIC_SUPABASE_URL');
+        const supabaseKey = getEnv('SUPABASE_KEY') || getEnv('PUBLIC_SUPABASE_ANON_KEY');
         
         console.log(`[Middleware] Environment variables availability: SUPABASE_URL=${!!supabaseUrl}, SUPABASE_KEY=${!!supabaseKey}`);
         

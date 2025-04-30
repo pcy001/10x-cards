@@ -29,14 +29,4 @@ export default defineConfig({
       noExternal: ["react-router-dom", "@tanstack/react-query"],
     },
   },
-  // Konfiguracja zmiennych środowiskowych
-  env: {
-    schema: {
-      SUPABASE_URL: { context: "server", access: "secret", type: "string" },
-      SUPABASE_KEY: { context: "server", access: "secret", type: "string" },
-      OPENROUTER_API_KEY: { context: "server", access: "secret", type: "string" },
-      PUBLIC_SUPABASE_URL: { context: "client", access: "public", type: "string" },
-      PUBLIC_SUPABASE_ANON_KEY: { context: "client", access: "public", type: "string" },
-    },
-  },
 });
