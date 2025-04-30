@@ -28,3 +28,9 @@ e2e-artifacts/
 playwright-report/
 test-results/
 playwright/.cache/
+
+# Cloudflare
+.wrangler/
+.mf/
+functions/\[\[path\]\].js
+.cloudflare/

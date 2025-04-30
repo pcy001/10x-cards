@@ -62,16 +62,22 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm install
+          npm install @astrojs/cloudflare@12.5.1 --save-exact
+          npm list @astrojs/cloudflare
 
       - name: Build project
-        run: npm run build
+        run: |
+          echo "Building with Cloudflare adapter..."
+          npm run build:cloudflare
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CF_PAGES: 1 # Flag for Cloudflare Pages
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
