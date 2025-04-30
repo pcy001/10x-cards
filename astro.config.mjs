@@ -28,5 +28,10 @@ export default defineConfig({
     ssr: {
       noExternal: ["react-router-dom", "@tanstack/react-query"],
     },
+    define: {
+      // Dodajemy globalne zmienne dla kodu kompilowanego
+      "globalThis.MessageChannel": "undefined",
+      "globalThis.MessagePort": "undefined",
+    },
   },
 });

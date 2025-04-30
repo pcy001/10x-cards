@@ -10,7 +10,7 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "build": "astro build",
-    "build:cloudflare": "CLOUDFLARE_PAGES=true CLOUDFLARE_KV_BINDING_SESSION=true ./node_modules/.bin/astro build",
+    "build:cloudflare": "CLOUDFLARE_PAGES=true CLOUDFLARE_KV_BINDING_SESSION=true ./node_modules/.bin/astro build && node scripts/postbuild.js",
     "build:test": "NODE_ENV=test astro build --config astro.test.config.mjs",
     "preview": "astro preview",
     "astro": "astro",
