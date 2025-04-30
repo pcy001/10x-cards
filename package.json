@@ -4,12 +4,13 @@
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
-    "dev:test": "astro dev --env-file=.env.test",
+    "dev:test": "astro dev --config astro.test.config.mjs --env-file=.env.test",
     "dev:local": "concurrently \"supabase start\" \"astro dev\"",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "build": "astro build",
+    "build:test": "astro build --config astro.test.config.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "lint": "eslint .",
@@ -19,8 +20,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e": "npm run build:test && playwright test",
+    "test:e2e:ui": "npm run build:test && playwright test --ui"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.5.1",
