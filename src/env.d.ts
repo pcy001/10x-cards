@@ -12,17 +12,30 @@ declare global {
   }
 }
 
-interface ImportMetaEnv {
-  readonly SUPABASE_URL: string;
-  readonly SUPABASE_KEY: string;
-  readonly OPENROUTER_API_KEY: string;
-  readonly PUBLIC_SUPABASE_URL: string;
-  readonly PUBLIC_SUPABASE_ANON_KEY: string;
-  // more env variables...
+// Zastosowanie astro:env do deklaracji zmiennych środowiskowych
+type EnvSchema = {
+  // Supabase
+  SUPABASE_URL: string;
+  SUPABASE_KEY: string;
+  PUBLIC_SUPABASE_URL: string;
+  PUBLIC_SUPABASE_ANON_KEY: string;
+  
+  // OpenRouter
+  OPENROUTER_API_KEY: string;
+  
+  // Inne zmienne środowiskowe
+  // ...
 }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
+type RuntimeEnv = "development" | "production" | "test";
+
+// Dostarcza typowanie dla importu z 'astro:env'
+declare module 'astro:env' {
+  export const SUPABASE_URL: string;
+  export const SUPABASE_KEY: string;
+  export const PUBLIC_SUPABASE_URL: string;
+  export const PUBLIC_SUPABASE_ANON_KEY: string;
+  export const OPENROUTER_API_KEY: string;
 }
 
 // Deklaracje dla Cloudflare

@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import * as env from 'astro:env';
 
 export const prerender = false;
 
@@ -16,17 +17,25 @@ export const GET: APIRoute = async ({ request, locals }) => {
       Request: typeof Request !== 'undefined',
       Response: typeof Response !== 'undefined',
       localStorage: typeof localStorage !== 'undefined',
+      self: typeof self !== 'undefined',
+      window: typeof window !== 'undefined',
+      document: typeof document !== 'undefined',
     };
 
-    // Sprawdź zmienne środowiskowe (maskujemy wartości)
-    const env = {
-      SUPABASE_URL: !!process.env.SUPABASE_URL || !!import.meta.env.SUPABASE_URL,
-      SUPABASE_KEY: !!process.env.SUPABASE_KEY || !!import.meta.env.SUPABASE_KEY,
-      PUBLIC_SUPABASE_URL: !!process.env.PUBLIC_SUPABASE_URL || !!import.meta.env.PUBLIC_SUPABASE_URL,
-      PUBLIC_SUPABASE_ANON_KEY: !!process.env.PUBLIC_SUPABASE_ANON_KEY || !!import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
-      CLOUDFLARE_KV_BINDING_SESSION: !!process.env.CLOUDFLARE_KV_BINDING_SESSION || !!import.meta.env.CLOUDFLARE_KV_BINDING_SESSION,
-      CF_PAGES: !!process.env.CF_PAGES || !!import.meta.env.CF_PAGES,
-    };
+    // Lista zmiennych do sprawdzenia
+    const envVarNames = [
+      'SUPABASE_URL',
+      'SUPABASE_KEY',
+      'PUBLIC_SUPABASE_URL',
+      'PUBLIC_SUPABASE_ANON_KEY',
+      'CLOUDFLARE_KV_BINDING_SESSION',
+      'CF_PAGES',
+    ];
+
+    // Sprawdź zmienne środowiskowe z użyciem astro:env (bez ujawniania wartości)
+    const envVars = Object.fromEntries(
+      envVarNames.map(name => [name, name in env && typeof env[name as keyof typeof env] === 'string'])
+    );
 
     // Sprawdź dostęp do klienta Supabase
     let supabaseStatus = 'Not available';
@@ -47,7 +56,13 @@ export const GET: APIRoute = async ({ request, locals }) => {
         method: request.method,
         headers: Object.fromEntries([...request.headers.entries()].filter(([key]) => !key.includes('auth') && !key.includes('cookie'))),
       },
-      environment: env,
+      environment: {
+        variables: envVars,
+        astroEnv: {
+          available: typeof env !== 'undefined',
+          hasVars: typeof env !== 'undefined' && Object.keys(env).length > 0,
+        }
+      },
       runtime: {
         globals,
         supabase: supabaseStatus,
