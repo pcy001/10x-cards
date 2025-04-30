@@ -1,5 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { supabaseClient } from "../db/supabase.client";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "../db/database.types";
 
 // Adresy URL, które nie wymagają uwierzytelnienia
 const PUBLIC_PATHS = [
@@ -26,6 +28,25 @@ function logError(context: string, error: unknown) {
   );
 }
 
+// Funkcja pomocnicza do pobrania zmiennych środowiskowych
+function getEnvVariable(name: string): string {
+  // Sprawdź różne sposoby dostępu do zmiennych
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[name]) {
+    return import.meta.env[name];
+  }
+  
+  if (typeof process !== 'undefined' && process.env && process.env[name]) {
+    return process.env[name];
+  }
+  
+  // Dodatkowa obsługa dla Cloudflare Pages
+  if (typeof self !== 'undefined' && name in (self as any)) {
+    return (self as any)[name];
+  }
+  
+  return '';
+}
+
 export const onRequest = defineMiddleware(async ({ request, locals, redirect }, next) => {
   try {
     console.log(`[Request] ${request.method} ${new URL(request.url).pathname}`);
@@ -37,11 +58,62 @@ export const onRequest = defineMiddleware(async ({ request, locals, redirect }, 
     
     // Dodaj klienta Supabase do kontekstu żądania
     try {
-      locals.supabase = supabaseClient;
-      console.log('[Middleware] Supabase client attached');
+      if (!supabaseClient) {
+        console.error('[Middleware] Supabase client not initialized from import');
+        
+        // Próba utworzenia nowego klienta jako fallback
+        const supabaseUrl = getEnvVariable('SUPABASE_URL') || getEnvVariable('PUBLIC_SUPABASE_URL');
+        const supabaseKey = getEnvVariable('SUPABASE_KEY') || getEnvVariable('PUBLIC_SUPABASE_ANON_KEY') || getEnvVariable('SUPABASE_ANON_KEY');
+        
+        console.log(`[Middleware] Environment variables availability: SUPABASE_URL=${!!supabaseUrl}, SUPABASE_KEY=${!!supabaseKey}`);
+        
+        if (supabaseUrl && supabaseKey) {
+          locals.supabase = createClient<Database>(supabaseUrl, supabaseKey);
+          console.log('[Middleware] Created fallback Supabase client');
+        } else {
+          // Dla celów diagnostycznych, zwróć 200 dla ścieżek diagnostycznych
+          const url = new URL(request.url);
+          if (url.pathname === '/api/debug/environment' || url.pathname === '/debug-info') {
+            console.log('[Middleware] Allowing debug endpoint without Supabase');
+            const response = await next();
+            return response;
+          }
+          
+          throw new Error('Missing Supabase environment variables');
+        }
+      } else {
+        locals.supabase = supabaseClient;
+        console.log('[Middleware] Supabase client attached from import');
+      }
     } catch (error) {
       logError('Supabase Client Initialization', error);
-      // Kontynuuj, aby zobaczyć inne potencjalne problemy
+      
+      // Dla celów diagnostycznych, zwróć 200 dla ścieżek diagnostycznych
+      const url = new URL(request.url);
+      if (url.pathname === '/api/debug/environment' || url.pathname === '/debug-info') {
+        console.log('[Middleware] Allowing debug endpoint despite Supabase error');
+        try {
+          const response = await next();
+          return response;
+        } catch (innerError) {
+          logError('Debug Endpoint Processing', innerError);
+          return new Response(JSON.stringify({
+            error: 'Failed to process debug request',
+            details: error instanceof Error ? error.message : String(error)
+          }), { 
+            status: 500, 
+            headers: { 'Content-Type': 'application/json' } 
+          });
+        }
+      }
+      
+      // Dla innych ścieżek, przekieruj do logowania lub zwróć błąd
+      if (PUBLIC_PATHS.includes(new URL(request.url).pathname)) {
+        console.log('[Middleware] Public path, continuing without Supabase');
+        return next();
+      } else {
+        return redirect("/auth/login");
+      }
     }
 
     // Sprawdź, czy ścieżka jest publiczna
@@ -55,7 +127,7 @@ export const onRequest = defineMiddleware(async ({ request, locals, redirect }, 
         const {
           data: { session },
           error,
-        } = await supabaseClient.auth.getSession();
+        } = await locals.supabase.auth.getSession();
 
         if (error) {
           logError('Session Check', error);
