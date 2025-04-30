@@ -22,20 +22,38 @@ export const GET: APIRoute = async ({ request, locals }) => {
       document: typeof document !== 'undefined',
     };
 
-    // Lista zmiennych do sprawdzenia
-    const envVarNames = [
-      'SUPABASE_URL',
-      'SUPABASE_KEY',
-      'PUBLIC_SUPABASE_URL',
-      'PUBLIC_SUPABASE_ANON_KEY',
-      'CLOUDFLARE_KV_BINDING_SESSION',
-      'CF_PAGES',
-    ];
+    // Sprawdź zmienne środowiskowe z astro:env
+    let envVars = {};
+    try {
+      // Sprawdź dostępność astro:env
+      envVars = {
+        SUPABASE_URL: false,
+        SUPABASE_KEY: false,
+        PUBLIC_SUPABASE_URL: false,
+        PUBLIC_SUPABASE_ANON_KEY: false,
+        OPENROUTER_API_KEY: false,
+      };
 
-    // Sprawdź zmienne środowiskowe z użyciem astro:env (bez ujawniania wartości)
-    const envVars = Object.fromEntries(
-      envVarNames.map(name => [name, name in env && typeof env[name as keyof typeof env] === 'string'])
-    );
+      // Sprawdź zmienne serwerowe/sekretne
+      try { envVars['SUPABASE_URL'] = !!env.getSecret('SUPABASE_URL'); } catch (e) {}
+      try { envVars['SUPABASE_KEY'] = !!env.getSecret('SUPABASE_KEY'); } catch (e) {}
+      try { envVars['OPENROUTER_API_KEY'] = !!env.getSecret('OPENROUTER_API_KEY'); } catch (e) {}
+
+      // Sprawdź zmienne publiczne
+      try { envVars['PUBLIC_SUPABASE_URL'] = !!env.getPublic('PUBLIC_SUPABASE_URL'); } catch (e) {}
+      try { envVars['PUBLIC_SUPABASE_ANON_KEY'] = !!env.getPublic('PUBLIC_SUPABASE_ANON_KEY'); } catch (e) {}
+    } catch (e) {
+      console.warn('Error checking astro:env variables', e);
+    }
+
+    // Sprawdź zmienne środowiskowe z import.meta.env (fallback)
+    const importMetaEnvVars = {
+      SUPABASE_URL: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.SUPABASE_URL : false,
+      SUPABASE_KEY: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.SUPABASE_KEY : false,
+      PUBLIC_SUPABASE_URL: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.PUBLIC_SUPABASE_URL : false,
+      PUBLIC_SUPABASE_ANON_KEY: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.PUBLIC_SUPABASE_ANON_KEY : false,
+      OPENROUTER_API_KEY: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.OPENROUTER_API_KEY : false,
+    };
 
     // Sprawdź dostęp do klienta Supabase
     let supabaseStatus = 'Not available';
@@ -57,10 +75,13 @@ export const GET: APIRoute = async ({ request, locals }) => {
         headers: Object.fromEntries([...request.headers.entries()].filter(([key]) => !key.includes('auth') && !key.includes('cookie'))),
       },
       environment: {
-        variables: envVars,
         astroEnv: {
           available: typeof env !== 'undefined',
-          hasVars: typeof env !== 'undefined' && Object.keys(env).length > 0,
+          variables: envVars,
+        },
+        importMetaEnv: {
+          available: typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined',
+          variables: importMetaEnvVars,
         }
       },
       runtime: {
