@@ -1,7 +1,33 @@
 import type { APIRoute } from "astro";
-import * as env from 'astro:env';
 
 export const prerender = false;
+
+// Funkcja pomocnicza do pobrania zmiennych środowiskowych
+function getEnv(name: string, fallback: string = ''): string {
+  // Sprawdź import.meta.env (działa zarówno w dev, build, jak i testach)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    const value = import.meta.env[name];
+    if (value) return value;
+  }
+  
+  // Sprawdź process.env (Node.js)
+  if (typeof process !== 'undefined' && process.env) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+  
+  // Sprawdź globalne self (Cloudflare Workers)
+  if (typeof self !== 'undefined' && (self as any)[name]) {
+    return (self as any)[name];
+  }
+  
+  return fallback;
+}
+
+// Sprawdź czy zmienna środowiskowa jest dostępna
+function hasEnv(name: string): boolean {
+  return !!getEnv(name);
+}
 
 /**
  * GET handler do diagnostyki środowiska
@@ -22,37 +48,27 @@ export const GET: APIRoute = async ({ request, locals }) => {
       document: typeof document !== 'undefined',
     };
 
-    // Sprawdź zmienne środowiskowe z astro:env
-    let envVars = {};
-    try {
-      // Sprawdź dostępność astro:env
-      envVars = {
-        SUPABASE_URL: false,
-        SUPABASE_KEY: false,
-        PUBLIC_SUPABASE_URL: false,
-        PUBLIC_SUPABASE_ANON_KEY: false,
-        OPENROUTER_API_KEY: false,
-      };
+    // Lista zmiennych do sprawdzenia
+    const envVarNames = [
+      'SUPABASE_URL',
+      'SUPABASE_KEY',
+      'PUBLIC_SUPABASE_URL',
+      'PUBLIC_SUPABASE_ANON_KEY',
+      'OPENROUTER_API_KEY',
+      'CLOUDFLARE_KV_BINDING_SESSION',
+      'CF_PAGES',
+    ];
 
-      // Sprawdź zmienne serwerowe/sekretne
-      try { envVars['SUPABASE_URL'] = !!env.getSecret('SUPABASE_URL'); } catch (e) {}
-      try { envVars['SUPABASE_KEY'] = !!env.getSecret('SUPABASE_KEY'); } catch (e) {}
-      try { envVars['OPENROUTER_API_KEY'] = !!env.getSecret('OPENROUTER_API_KEY'); } catch (e) {}
+    // Sprawdź zmienne środowiskowe z uniwersalnej funkcji (bez ujawniania wartości)
+    const envVars = Object.fromEntries(envVarNames.map(name => [name, hasEnv(name)]));
 
-      // Sprawdź zmienne publiczne
-      try { envVars['PUBLIC_SUPABASE_URL'] = !!env.getPublic('PUBLIC_SUPABASE_URL'); } catch (e) {}
-      try { envVars['PUBLIC_SUPABASE_ANON_KEY'] = !!env.getPublic('PUBLIC_SUPABASE_ANON_KEY'); } catch (e) {}
-    } catch (e) {
-      console.warn('Error checking astro:env variables', e);
-    }
-
-    // Sprawdź zmienne środowiskowe z import.meta.env (fallback)
-    const importMetaEnvVars = {
-      SUPABASE_URL: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.SUPABASE_URL : false,
-      SUPABASE_KEY: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.SUPABASE_KEY : false,
-      PUBLIC_SUPABASE_URL: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.PUBLIC_SUPABASE_URL : false,
-      PUBLIC_SUPABASE_ANON_KEY: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.PUBLIC_SUPABASE_ANON_KEY : false,
-      OPENROUTER_API_KEY: typeof import.meta !== 'undefined' && import.meta.env ? !!import.meta.env.OPENROUTER_API_KEY : false,
+    // Sprawdź dostępne metody dostępu do zmiennych środowiskowych
+    const envAccess = {
+      importMeta: typeof import.meta !== 'undefined',
+      importMetaEnv: typeof import.meta !== 'undefined' && 'env' in import.meta,
+      process: typeof process !== 'undefined',
+      processEnv: typeof process !== 'undefined' && 'env' in process,
+      self: typeof self !== 'undefined',
     };
 
     // Sprawdź dostęp do klienta Supabase
@@ -75,14 +91,8 @@ export const GET: APIRoute = async ({ request, locals }) => {
         headers: Object.fromEntries([...request.headers.entries()].filter(([key]) => !key.includes('auth') && !key.includes('cookie'))),
       },
       environment: {
-        astroEnv: {
-          available: typeof env !== 'undefined',
-          variables: envVars,
-        },
-        importMetaEnv: {
-          available: typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined',
-          variables: importMetaEnvVars,
-        }
+        variables: envVars,
+        access: envAccess,
       },
       runtime: {
         globals,
