@@ -3,6 +3,9 @@ import { supabaseClient } from "../db/supabase.client";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "../db/database.types";
 
+// Import zmiennych środowiskowych z Astro
+import { SUPABASE_URL, SUPABASE_KEY, PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from 'astro:env';
+
 // Adresy URL, które nie wymagają uwierzytelnienia
 const PUBLIC_PATHS = [
   "/auth/login",
@@ -28,25 +31,6 @@ function logError(context: string, error: unknown) {
   );
 }
 
-// Funkcja pomocnicza do pobrania zmiennych środowiskowych
-function getEnvVariable(name: string): string {
-  // Sprawdź różne sposoby dostępu do zmiennych
-  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[name]) {
-    return import.meta.env[name];
-  }
-  
-  if (typeof process !== 'undefined' && process.env && process.env[name]) {
-    return process.env[name];
-  }
-  
-  // Dodatkowa obsługa dla Cloudflare Pages
-  if (typeof self !== 'undefined' && name in (self as any)) {
-    return (self as any)[name];
-  }
-  
-  return '';
-}
-
 export const onRequest = defineMiddleware(async ({ request, locals, redirect }, next) => {
   try {
     console.log(`[Request] ${request.method} ${new URL(request.url).pathname}`);
@@ -62,8 +46,8 @@ export const onRequest = defineMiddleware(async ({ request, locals, redirect }, 
         console.error('[Middleware] Supabase client not initialized from import');
         
         // Próba utworzenia nowego klienta jako fallback
-        const supabaseUrl = getEnvVariable('SUPABASE_URL') || getEnvVariable('PUBLIC_SUPABASE_URL');
-        const supabaseKey = getEnvVariable('SUPABASE_KEY') || getEnvVariable('PUBLIC_SUPABASE_ANON_KEY') || getEnvVariable('SUPABASE_ANON_KEY');
+        const supabaseUrl = SUPABASE_URL || PUBLIC_SUPABASE_URL || '';
+        const supabaseKey = SUPABASE_KEY || PUBLIC_SUPABASE_ANON_KEY || '';
         
         console.log(`[Middleware] Environment variables availability: SUPABASE_URL=${!!supabaseUrl}, SUPABASE_KEY=${!!supabaseKey}`);
         
