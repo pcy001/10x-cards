@@ -15,6 +15,9 @@ export default defineConfig({
   output: "server",
   adapter: cloudflare(),
   integrations: [react(), sitemap()],
+  experimental: {
+    session: true,
+  },
   vite: {
     plugins: [tailwindcss()],
     resolve: {
