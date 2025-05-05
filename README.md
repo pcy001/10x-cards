@@ -2,6 +2,10 @@
 
 Aplikacja do nauki z fiszkami z wykorzystaniem nowoczesnych technologii.
 
+## Demo
+
+Wersja demo aplikacji jest dostępna pod adresem: [10x-cards-dg7.pages.dev](https://10x-cards-dg7.pages.dev)
+
 ## Struktura aplikacji
 
 ### Dashboard
